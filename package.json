@@ -1,0 +1,15 @@
+{
+  "name": "unifi-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "bash scripts/dev.sh",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "db:studio": "bash scripts/studio.sh",
+    "smoke": "bash scripts/smoke.sh",
+    "start:backend": "npm --prefix backend run start",
+    "build:frontend": "npm --prefix frontend run build"
+  }
+}

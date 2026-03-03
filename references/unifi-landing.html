@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniFi — Borrow Within Your Campus</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --black: #06060A;
+  --gold: #C9A84C;
+  --gold-bright: #F0D885;
+  --green: #00D09C;
+  --muted: rgba(255,255,255,0.38);
+  --subtle: rgba(255,255,255,0.06);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--black);
+  color: #F0F0F8;
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ── CURSOR ── */
+.cursor {
+  position: fixed; width: 10px; height: 10px;
+  background: var(--gold); border-radius: 50%;
+  pointer-events: none; z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: transform 0.1s, width 0.3s, height 0.3s, background 0.3s;
+  mix-blend-mode: difference;
+}
+.cursor-ring {
+  position: fixed; width: 36px; height: 36px;
+  border: 1px solid rgba(201,168,76,0.5); border-radius: 50%;
+  pointer-events: none; z-index: 9998;
+  transform: translate(-50%,-50%);
+  transition: transform 0.18s ease-out, width 0.3s, height 0.3s;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 24px 60px;
+  display: flex; align-items: center; justify-content: space-between;
+  transition: all 0.4s;
+}
+nav.scrolled {
+  background: rgba(6,6,10,0.9);
+  backdrop-filter: blur(20px);
+  padding: 16px 60px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.nav-logo {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.nav-links { display: flex; gap: 36px; align-items: center; }
+.nav-link {
+  font-size: 0.82rem; color: var(--muted); text-decoration: none;
+  font-weight: 500; transition: color 0.2s; letter-spacing: 0.03em;
+}
+.nav-link:hover { color: #fff; }
+.nav-cta {
+  background: var(--gold); color: #000;
+  padding: 10px 24px; border-radius: 24px;
+  font-size: 0.82rem; font-weight: 700; text-decoration: none;
+  transition: all 0.2s; letter-spacing: 0.03em;
+}
+.nav-cta:hover { background: var(--gold-bright); transform: translateY(-1px); box-shadow: 0 8px 30px rgba(201,168,76,0.3); }
+
+/* ── NOISE OVERLAY ── */
+.noise {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  padding: 120px 60px 80px;
+}
+
+/* Animated gradient orbs */
+.orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(120px); pointer-events: none;
+}
+.orb-1 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%);
+  top: -200px; left: -100px;
+  animation: orbFloat1 12s ease-in-out infinite;
+}
+.orb-2 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(0,208,156,0.08) 0%, transparent 70%);
+  bottom: -100px; right: -100px;
+  animation: orbFloat2 15s ease-in-out infinite;
+}
+.orb-3 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(201,168,76,0.06) 0%, transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  animation: orbFloat3 8s ease-in-out infinite;
+}
+@keyframes orbFloat1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(60px,40px)} }
+@keyframes orbFloat2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-40px,-60px)} }
+@keyframes orbFloat3 { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.2)} }
+
+/* Grid lines */
+.grid-lines {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.03;
+  background-image:
+    linear-gradient(rgba(255,255,255,1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+}
+
+.hero-eyebrow {
+  font-family: 'DM Mono', monospace; font-size: 0.72rem;
+  color: var(--gold); letter-spacing: 0.25em; text-transform: uppercase;
+  margin-bottom: 28px;
+  opacity: 0; animation: fadeUp 0.8s 0.3s ease forwards;
+  display: flex; align-items: center; gap: 12px;
+}
+.hero-eyebrow::before, .hero-eyebrow::after {
+  content: ''; display: block; width: 32px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold));
+}
+.hero-eyebrow::after { background: linear-gradient(90deg, var(--gold), transparent); }
+
+.hero-headline {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(3.5rem, 8vw, 7.5rem);
+  line-height: 0.95; letter-spacing: -0.02em;
+  text-align: center; max-width: 900px;
+  margin-bottom: 32px;
+  opacity: 0; animation: fadeUp 0.9s 0.5s ease forwards;
+}
+.hero-headline .line-gold {
+  display: block;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite 1.5s;
+}
+@keyframes shimmer { to { background-position: 200% center; } }
+
+.hero-sub {
+  font-size: 1.05rem; color: var(--muted); text-align: center;
+  max-width: 480px; line-height: 1.7; font-weight: 300;
+  margin-bottom: 52px;
+  opacity: 0; animation: fadeUp 0.9s 0.7s ease forwards;
+}
+
+.hero-actions {
+  display: flex; gap: 16px; align-items: center;
+  opacity: 0; animation: fadeUp 0.9s 0.9s ease forwards;
+  margin-bottom: 80px;
+}
+.btn-hero-primary {
+  background: var(--gold); color: #000;
+  padding: 16px 40px; border-radius: 50px;
+  font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+  text-decoration: none; letter-spacing: 0.03em;
+  transition: all 0.3s; position: relative; overflow: hidden;
+}
+.btn-hero-primary::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.btn-hero-primary:hover::before { opacity: 1; }
+.btn-hero-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 50px rgba(201,168,76,0.4); }
+.btn-hero-ghost {
+  color: rgba(255,255,255,0.7); text-decoration: none;
+  font-size: 0.9rem; font-weight: 400;
+  display: flex; align-items: center; gap: 8px;
+  transition: color 0.2s;
+}
+.btn-hero-ghost:hover { color: #fff; }
+.btn-hero-ghost .arrow { 
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; transition: all 0.2s;
+}
+.btn-hero-ghost:hover .arrow { border-color: rgba(255,255,255,0.4); transform: translateX(3px); }
+
+/* Hero stats strip */
+.hero-stats {
+  display: flex; gap: 0; 
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px; overflow: hidden;
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(10px);
+  opacity: 0; animation: fadeUp 0.9s 1.1s ease forwards;
+}
+.hero-stat {
+  padding: 20px 36px; text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.07);
+  position: relative;
+}
+.hero-stat:last-child { border-right: none; }
+.hero-stat-num {
+  font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800;
+  color: var(--gold); display: block; margin-bottom: 4px;
+}
+.hero-stat-label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
+
+/* Scroll indicator */
+.scroll-hint {
+  position: absolute; bottom: 40px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  opacity: 0; animation: fadeIn 1s 1.8s ease forwards;
+}
+.scroll-line {
+  width: 1px; height: 50px;
+  background: linear-gradient(to bottom, var(--gold), transparent);
+  animation: scrollDrop 2s ease-in-out infinite;
+}
+@keyframes scrollDrop {
+  0% { transform: scaleY(0); transform-origin: top; }
+  50% { transform: scaleY(1); transform-origin: top; }
+  51% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+.scroll-text { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.2em; }
+
+/* ── STORY SECTIONS ── */
+.story-section {
+  min-height: 100vh;
+  display: flex; align-items: center;
+  padding: 120px 60px;
+  position: relative; overflow: hidden;
+}
+
+/* ── SECTION: THE PROBLEM ── */
+#problem {
+  background: var(--black);
+}
+.problem-inner {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 100px;
+  align-items: center; max-width: 1200px; margin: 0 auto;
+}
+.section-tag {
+  font-family: 'DM Mono', monospace; font-size: 0.7rem;
+  color: var(--gold); letter-spacing: 0.2em; text-transform: uppercase;
+  margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+}
+.section-tag::before { content: ''; width: 20px; height: 1px; background: var(--gold); }
+.story-headline {
+  font-family: 'Syne', sans-serif; font-weight: 800;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.05; letter-spacing: -0.02em;
+  margin-bottom: 24px;
+}
+.story-body {
+  font-size: 1rem; color: var(--muted); line-height: 1.85; font-weight: 300;
+  margin-bottom: 20px;
+}
+.story-body em { color: rgba(255,255,255,0.7); font-style: normal; font-weight: 400; }
+
+/* Problem visual */
+.problem-visual {
+  position: relative; height: 400px;
+}
+.chat-bubble {
+  position: absolute; background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+  padding: 16px 20px; font-size: 0.85rem; line-height: 1.5;
+  max-width: 260px; color: rgba(255,255,255,0.6);
+  animation: floatBubble 4s ease-in-out infinite;
+}
+.chat-bubble.left { border-bottom-left-radius: 4px; }
+.chat-bubble.right { border-bottom-right-radius: 4px; text-align: right; }
+.chat-bubble .sender { font-size: 0.68rem; color: var(--muted); margin-bottom: 6px; font-family: 'DM Mono', monospace; }
+.chat-bubble.gold-border { border-color: rgba(201,168,76,0.3); color: rgba(255,255,255,0.8); }
+.chat-bubble .time { font-size: 0.62rem; color: var(--muted); margin-top: 6px; }
+@keyframes floatBubble { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+/* ── SECTION: HOW IT WORKS ── */
+#how {
+  background: linear-gradient(180deg, var(--black) 0%, #0A0A12 100%);
+}
+.how-inner { max-width: 1200px; margin: 0 auto; width: 100%; }
+.how-header { text-align: center; margin-bottom: 80px; }
+.steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.step-card {
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+  padding: 48px 36px; position: relative; overflow: hidden;
+  transition: all 0.4s;
+}
+.step-card:hover { background: rgba(255,255,255,0.04); border-color: rgba(201,168,76,0.2); }
+.step-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,168,76,0.4), transparent);
+  opacity: 0; transition: opacity 0.4s;
+}
+.step-card:hover::before { opacity: 1; }
+.step-number {
+  font-family: 'Syne', sans-serif; font-size: 5rem; font-weight: 800;
+  color: rgba(255,255,255,0.03); position: absolute; top: 20px; right: 24px;
+  line-height: 1;
+}
+.step-icon { font-size: 2rem; margin-bottom: 20px; display: block; }
+.step-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; }
+.step-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
+.step-for { 
+  margin-top: 20px; font-size: 0.7rem; font-family: 'DM Mono', monospace;
+  color: var(--gold); letter-spacing: 0.1em;
+}
+
+/* ── SECTION: THE THREE PORTALS ── */
+#portals { background: #0A0A12; }
+.portals-inner { max-width: 1200px; margin: 0 auto; width: 100%; }
+.portals-header { text-align: center; margin-bottom: 80px; }
+.portals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.portal-card {
+  border-radius: 28px; padding: 48px 36px;
+  position: relative; overflow: hidden;
+  transition: all 0.4s; cursor: pointer;
+}
+.portal-card:hover { transform: translateY(-8px); }
+.portal-card.admin-card {
+  background: linear-gradient(135deg, rgba(76,142,255,0.08) 0%, rgba(76,142,255,0.03) 100%);
+  border: 1px solid rgba(76,142,255,0.15);
+}
+.portal-card.admin-card:hover { border-color: rgba(76,142,255,0.4); box-shadow: 0 40px 80px rgba(76,142,255,0.1); }
+.portal-card.borrower-card {
+  background: linear-gradient(135deg, rgba(201,168,76,0.08) 0%, rgba(201,168,76,0.03) 100%);
+  border: 1px solid rgba(201,168,76,0.15);
+}
+.portal-card.borrower-card:hover { border-color: rgba(201,168,76,0.4); box-shadow: 0 40px 80px rgba(201,168,76,0.1); }
+.portal-card.provider-card {
+  background: linear-gradient(135deg, rgba(0,208,156,0.08) 0%, rgba(0,208,156,0.03) 100%);
+  border: 1px solid rgba(0,208,156,0.15);
+}
+.portal-card.provider-card:hover { border-color: rgba(0,208,156,0.4); box-shadow: 0 40px 80px rgba(0,208,156,0.1); }
+.portal-glyph { 
+  width: 64px; height: 64px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; margin-bottom: 28px;
+}
+.admin-glyph { background: rgba(76,142,255,0.12); }
+.borrower-glyph { background: rgba(201,168,76,0.12); }
+.provider-glyph { background: rgba(0,208,156,0.12); }
+.portal-role {
+  font-family: 'DM Mono', monospace; font-size: 0.68rem;
+  letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 12px;
+}
+.admin-role { color: #4C8EFF; }
+.borrower-role { color: var(--gold); }
+.provider-role { color: var(--green); }
+.portal-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; margin-bottom: 16px; }
+.portal-desc { font-size: 0.88rem; color: var(--muted); line-height: 1.7; margin-bottom: 28px; }
+.portal-features { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.portal-feature { display: flex; align-items: flex-start; gap: 10px; font-size: 0.82rem; color: rgba(255,255,255,0.55); }
+.portal-feature::before { content: '—'; color: var(--muted); flex-shrink: 0; margin-top: 1px; }
+.portal-cta {
+  margin-top: 36px; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 0.82rem; font-weight: 600; text-decoration: none;
+  transition: gap 0.2s;
+}
+.portal-cta:hover { gap: 14px; }
+.admin-cta { color: #4C8EFF; }
+.borrower-cta { color: var(--gold); }
+.provider-cta { color: var(--green); }
+
+/* ── SECTION: MONEY FLOW ── */
+#flow { background: var(--black); }
+.flow-inner { max-width: 1000px; margin: 0 auto; width: 100%; }
+.flow-header { text-align: center; margin-bottom: 80px; }
+.flow-diagram {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; position: relative; margin-bottom: 60px;
+}
+.flow-node {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 28px 32px; text-align: center;
+  min-width: 160px; position: relative; z-index: 2;
+  transition: all 0.3s;
+}
+.flow-node:hover { border-color: rgba(201,168,76,0.3); background: rgba(255,255,255,0.05); }
+.flow-node-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+.flow-node-name { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+.flow-node-sub { font-size: 0.72rem; color: var(--muted); }
+.flow-connector {
+  flex: 1; position: relative; height: 2px; min-width: 60px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(201,168,76,0.3), rgba(255,255,255,0.05));
+}
+.flow-connector::after {
+  content: ''; position: absolute; top: 50%; right: -1px;
+  transform: translateY(-50%);
+  border-left: 8px solid rgba(201,168,76,0.6);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+.flow-label {
+  position: absolute; top: -28px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 0.62rem; color: var(--gold);
+  font-family: 'DM Mono', monospace; letter-spacing: 0.1em;
+}
+.flow-label-bottom {
+  top: auto; bottom: -24px;
+  color: var(--green);
+}
+
+/* Calculation card */
+.calc-card {
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 24px; padding: 40px; max-width: 600px; margin: 0 auto;
+}
+.calc-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 0.9rem;
+}
+.calc-row:last-child { border-bottom: none; padding-bottom: 0; }
+.calc-label { color: var(--muted); }
+.calc-value { font-family: 'Syne', sans-serif; font-weight: 700; }
+.calc-total {
+  background: linear-gradient(135deg, rgba(0,208,156,0.08), rgba(0,208,156,0.03));
+  border: 1px solid rgba(0,208,156,0.2); border-radius: 14px;
+  padding: 20px; margin-top: 20px; display: flex; justify-content: space-between;
+}
+.calc-total-label { font-size: 0.82rem; color: rgba(255,255,255,0.6); }
+.calc-total-value { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--green); }
+
+/* ── SECTION: TRUST ── */
+#trust { background: #0A0A12; }
+.trust-inner { max-width: 1200px; margin: 0 auto; width: 100%; }
+.trust-header { text-align: center; margin-bottom: 80px; }
+.trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 60px; }
+.trust-card {
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px; padding: 32px 24px; text-align: center;
+  transition: all 0.3s;
+}
+.trust-card:hover { border-color: rgba(201,168,76,0.2); background: rgba(255,255,255,0.04); }
+.trust-icon { font-size: 2rem; margin-bottom: 16px; display: block; }
+.trust-title { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+.trust-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+
+/* Testimonials */
+.testimonial-strip { display: flex; gap: 20px; overflow: hidden; position: relative; }
+.testimonial-strip::before, .testimonial-strip::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 100px; z-index: 2;
+}
+.testimonial-strip::before { left: 0; background: linear-gradient(90deg, #0A0A12, transparent); }
+.testimonial-strip::after { right: 0; background: linear-gradient(270deg, #0A0A12, transparent); }
+.testimonials-track {
+  display: flex; gap: 20px;
+  animation: scrollTrack 30s linear infinite;
+}
+@keyframes scrollTrack { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.testimonial {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; padding: 24px 28px; min-width: 300px;
+  flex-shrink: 0;
+}
+.testimonial-text { font-size: 0.88rem; color: rgba(255,255,255,0.65); line-height: 1.6; margin-bottom: 16px; font-style: italic; }
+.testimonial-author { display: flex; align-items: center; gap: 10px; }
+.testimonial-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; }
+.testimonial-name { font-size: 0.78rem; font-weight: 600; }
+.testimonial-meta { font-size: 0.68rem; color: var(--muted); }
+
+/* ── SECTION: CTA ── */
+#cta-section {
+  min-height: 80vh; display: flex; align-items: center; justify-content: center;
+  padding: 120px 60px; position: relative; overflow: hidden;
+  background: var(--black);
+}
+.cta-orb {
+  position: absolute; width: 700px; height: 700px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 65%);
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  animation: ctaPulse 6s ease-in-out infinite;
+}
+@keyframes ctaPulse { 0%,100%{transform:translate(-50%,-50%) scale(1)} 50%{transform:translate(-50%,-50%) scale(1.15)} }
+.cta-inner { text-align: center; max-width: 700px; position: relative; z-index: 2; }
+.cta-eyebrow { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--gold); letter-spacing: 0.2em; margin-bottom: 24px; }
+.cta-headline {
+  font-family: 'Syne', sans-serif; font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 800; line-height: 1; letter-spacing: -0.02em; margin-bottom: 24px;
+}
+.cta-sub { font-size: 1rem; color: var(--muted); margin-bottom: 52px; line-height: 1.7; font-weight: 300; }
+.cta-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+.btn-cta-borrow {
+  background: var(--gold); color: #000;
+  padding: 18px 48px; border-radius: 50px;
+  font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+  text-decoration: none; transition: all 0.3s; letter-spacing: 0.02em;
+}
+.btn-cta-borrow:hover { transform: translateY(-3px); box-shadow: 0 20px 60px rgba(201,168,76,0.4); }
+.btn-cta-lend {
+  background: rgba(0,208,156,0.1); color: var(--green);
+  border: 1px solid rgba(0,208,156,0.3);
+  padding: 18px 48px; border-radius: 50px;
+  font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+  text-decoration: none; transition: all 0.3s; letter-spacing: 0.02em;
+}
+.btn-cta-lend:hover { transform: translateY(-3px); box-shadow: 0 20px 60px rgba(0,208,156,0.2); background: rgba(0,208,156,0.15); }
+.cta-note { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.03em; }
+.cta-note span { color: rgba(255,255,255,0.4); }
+
+/* ── FOOTER ── */
+footer {
+  padding: 40px 60px; border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; color: var(--gold); }
+.footer-note { font-size: 0.75rem; color: var(--muted); }
+.footer-links { display: flex; gap: 28px; }
+.footer-link { font-size: 0.75rem; color: var(--muted); text-decoration: none; transition: color 0.2s; }
+.footer-link:hover { color: rgba(255,255,255,0.6); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+
+/* Scroll-reveal */
+.sr {
+  opacity: 0; transform: translateY(40px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.sr.sr-left { transform: translateX(-40px); }
+.sr.sr-right { transform: translateX(40px); }
+.sr.visible { opacity: 1; transform: none; }
+.sr-delay-1 { transition-delay: 0.1s; }
+.sr-delay-2 { transition-delay: 0.2s; }
+.sr-delay-3 { transition-delay: 0.3s; }
+.sr-delay-4 { transition-delay: 0.4s; }
+.sr-delay-5 { transition-delay: 0.5s; }
+
+/* ── MARQUEE STRIP ── */
+.marquee-strip {
+  overflow: hidden; border-top: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding: 16px 0; background: rgba(255,255,255,0.01);
+}
+.marquee-track {
+  display: flex; gap: 60px;
+  animation: marquee 20s linear infinite;
+  width: max-content;
+}
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-item {
+  font-family: 'DM Mono', monospace; font-size: 0.72rem;
+  color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase;
+  white-space: nowrap; display: flex; align-items: center; gap: 20px;
+}
+.marquee-item::after { content: '◆'; color: rgba(201,168,76,0.4); font-size: 0.4rem; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  nav { padding: 20px 24px; }
+  nav.scrolled { padding: 14px 24px; }
+  .nav-links { display: none; }
+  #hero, .story-section { padding: 100px 24px 60px; }
+  .problem-inner { grid-template-columns: 1fr; gap: 50px; }
+  .steps-grid, .portals-grid { grid-template-columns: 1fr; }
+  .trust-grid { grid-template-columns: repeat(2, 1fr); }
+  .flow-diagram { flex-direction: column; gap: 20px; }
+  .flow-connector { width: 2px; height: 40px; min-width: auto; background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(201,168,76,0.3), rgba(255,255,255,0.05)); }
+  .flow-connector::after { top: auto; bottom: -5px; right: 50%; transform: translateX(50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid rgba(201,168,76,0.6); border-bottom: none; }
+  footer { flex-direction: column; gap: 20px; text-align: center; }
+  #cta-section { padding: 80px 24px; }
+  .cta-buttons { flex-direction: column; align-items: center; }
+  body { cursor: auto; }
+  .cursor, .cursor-ring { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- Noise texture -->
+<div class="noise"></div>
+
+<!-- ── NAV ── -->
+<nav id="nav">
+  <div class="nav-logo">UniFi</div>
+  <div class="nav-links">
+    <a href="#problem" class="nav-link">Problem</a>
+    <a href="#how" class="nav-link">How It Works</a>
+    <a href="#portals" class="nav-link">Portals</a>
+    <a href="#trust" class="nav-link">Trust</a>
+    <a href="#cta-section" class="nav-cta">Join Now</a>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<section id="hero">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="grid-lines"></div>
+
+  <div class="hero-eyebrow">University Peer-to-Peer Lending</div>
+
+  <h1 class="hero-headline">
+    Your campus.<br>
+    <span class="line-gold">Your credit.</span><br>
+    Your terms.
+  </h1>
+
+  <p class="hero-sub">
+    UniFi bridges the gap between students who need money and students who have it — safely, transparently, within your university network.
+  </p>
+
+  <div class="hero-actions">
+    <a href="#cta-section" class="btn-hero-primary">Start Borrowing</a>
+    <a href="#how" class="btn-hero-ghost">
+      See how it works
+      <span class="arrow">↓</span>
+    </a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <span class="hero-stat-num" data-target="2400">0</span>
+      <span class="hero-stat-label">Students Onboard</span>
+    </div>
+    <div class="hero-stat">
+      <span class="hero-stat-num" data-target="98" data-suffix="%">0%</span>
+      <span class="hero-stat-label">Repayment Rate</span>
+    </div>
+    <div class="hero-stat">
+      <span class="hero-stat-num" data-prefix="₹" data-target="12400000">₹0</span>
+      <span class="hero-stat-label">Disbursed</span>
+    </div>
+    <div class="hero-stat">
+      <span class="hero-stat-num" data-target="30" data-suffix=" min">0 min</span>
+      <span class="hero-stat-label">Avg. Disbursal Time</span>
+    </div>
+  </div>
+
+  <div class="scroll-hint">
+    <div class="scroll-line"></div>
+    <span class="scroll-text">Scroll</span>
+  </div>
+</section>
+
+<!-- ── MARQUEE ── -->
+<div class="marquee-strip">
+  <div class="marquee-track">
+    <span class="marquee-item">University Verified Students</span>
+    <span class="marquee-item">UPI Powered Payments</span>
+    <span class="marquee-item">Zero Hidden Charges</span>
+    <span class="marquee-item">30-Minute Disbursal</span>
+    <span class="marquee-item">AES-256 Encrypted</span>
+    <span class="marquee-item">Peer-to-Peer Trust</span>
+    <span class="marquee-item">Credit Score Building</span>
+    <span class="marquee-item">Campus-Only Network</span>
+    <span class="marquee-item">University Verified Students</span>
+    <span class="marquee-item">UPI Powered Payments</span>
+    <span class="marquee-item">Zero Hidden Charges</span>
+    <span class="marquee-item">30-Minute Disbursal</span>
+    <span class="marquee-item">AES-256 Encrypted</span>
+    <span class="marquee-item">Peer-to-Peer Trust</span>
+    <span class="marquee-item">Credit Score Building</span>
+    <span class="marquee-item">Campus-Only Network</span>
+  </div>
+</div>
+
+<!-- ── THE PROBLEM ── -->
+<section id="problem" class="story-section">
+  <div class="problem-inner">
+    <div>
+      <div class="section-tag sr">The Problem</div>
+      <h2 class="story-headline sr sr-delay-1">
+        The month end<br>always hits<br><span style="color:var(--gold)">differently.</span>
+      </h2>
+      <p class="story-body sr sr-delay-2">
+        You're a student. You have a <em>₹2,000 mess bill due tomorrow</em>. Your parents transferred last week but the ATM queue is long and your UPI limit hit. Sound familiar?
+      </p>
+      <p class="story-body sr sr-delay-3">
+        Banks won't touch you. You don't have a credit history. Loan apps charge <em>predatory interest</em>. And borrowing from friends is always awkward.
+      </p>
+      <p class="story-body sr sr-delay-4">
+        Meanwhile, your batchmate Rohan has <em>₹5,000 sitting idle</em> in his account and wouldn't mind earning a small return on it — if only there was a safe way.
+      </p>
+      <p class="story-body sr sr-delay-5" style="color:rgba(255,255,255,0.5);font-style:italic;border-left:2px solid rgba(201,168,76,0.4);padding-left:20px;margin-top:28px;">
+        "There's a gap between students who need and students who have. UniFi is the bridge."
+      </p>
+    </div>
+    <div class="problem-visual sr sr-right">
+      <!-- Floating chat bubbles that tell the story -->
+      <div class="chat-bubble left" style="top:20px;left:0;animation-delay:0s;">
+        <div class="sender">Student #4821</div>
+        yaar mess fee kal tak deni hai, kya ₹1500 ho sakta hai?
+        <div class="time">yesterday, 11:42 PM</div>
+      </div>
+      <div class="chat-bubble right gold-border" style="top:140px;right:0;animation-delay:0.8s;">
+        <div class="sender">Student #2204</div>
+        bhai mera bhi thoda tight hai this week 😅
+        <div class="time">yesterday, 11:58 PM</div>
+      </div>
+      <div class="chat-bubble left" style="top:270px;left:20px;animation-delay:1.6s;">
+        <div class="sender">Student #4821</div>
+        no worries... I'll figure something out
+        <div class="time">today, 12:04 AM</div>
+      </div>
+      <!-- Solution card -->
+      <div style="position:absolute;bottom:0;right:0;background:linear-gradient(135deg,rgba(0,208,156,0.08),rgba(0,208,156,0.03));border:1px solid rgba(0,208,156,0.2);border-radius:20px;padding:20px;max-width:240px;animation:floatBubble 5s ease-in-out infinite 2s;">
+        <div style="font-size:0.65rem;font-family:'DM Mono',monospace;color:var(--green);letter-spacing:0.15em;margin-bottom:8px;">UNIFI MATCH FOUND</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--green);margin-bottom:4px;">₹1,500</div>
+        <div style="font-size:0.72rem;color:var(--muted);">Provider found in your campus · Disbursal in 18 min</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ── -->
+<section id="how" class="story-section" style="padding-top:100px;padding-bottom:100px;">
+  <div class="how-inner">
+    <div class="how-header">
+      <div class="section-tag sr" style="justify-content:center;">How It Works</div>
+      <h2 class="story-headline sr sr-delay-1" style="text-align:center;max-width:600px;margin:0 auto 16px;">
+        Simple enough for<br>a <span style="color:var(--gold)">2 AM emergency.</span>
+      </h2>
+      <p style="text-align:center;color:var(--muted);font-size:0.9rem;max-width:400px;margin:0 auto;" class="sr sr-delay-2">Three roles. One platform. Money moves in under 30 minutes.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card sr sr-delay-1">
+        <div class="step-number">1</div>
+        <span class="step-icon">🎓</span>
+        <div class="step-title">Verify Your Campus Identity</div>
+        <div class="step-desc">Sign up with your university email. Upload your student ID. Our admin reviews and approves you — usually within a few hours. No Aadhaar, no CIBIL, no nonsense.</div>
+        <div class="step-for">For Borrowers & Providers</div>
+      </div>
+      <div class="step-card sr sr-delay-2">
+        <div class="step-number">2</div>
+        <span class="step-icon">💸</span>
+        <div class="step-title">Request or Browse Loans</div>
+        <div class="step-desc">Borrowers set an amount, pick a tenure (7, 14, or 30 days), and see the exact repayment upfront. Providers browse anonymous loan requests and fund the ones they like.</div>
+        <div class="step-for">Borrowers request · Providers browse</div>
+      </div>
+      <div class="step-card sr sr-delay-3">
+        <div class="step-number">3</div>
+        <span class="step-icon">⚡</span>
+        <div class="step-title">Money Moves via UPI</div>
+        <div class="step-desc">Provider sends to UniFi escrow. We release to the borrower instantly. On due date, borrower repays through UPI. Provider receives principal + returns. UniFi takes a small cut.</div>
+        <div class="step-for">Secure · Traceable · Fast</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── THREE PORTALS ── -->
+<section id="portals" class="story-section" style="padding-top:100px;padding-bottom:100px;">
+  <div class="portals-inner">
+    <div class="portals-header">
+      <div class="section-tag sr" style="justify-content:center;">Three Portals</div>
+      <h2 class="story-headline sr sr-delay-1" style="text-align:center;">
+        One platform.<br>Three <span style="color:var(--gold)">perspectives.</span>
+      </h2>
+      <p style="text-align:center;color:var(--muted);font-size:0.9rem;max-width:400px;margin:16px auto 0;" class="sr sr-delay-2">Each role gets their own dashboard — built for exactly what they need.</p>
+    </div>
+    <div class="portals-grid">
+      <div class="portal-card admin-card sr sr-delay-1">
+        <div class="portal-glyph admin-glyph">🛡️</div>
+        <div class="portal-role admin-role">Admin Portal</div>
+        <div class="portal-title">Command Center</div>
+        <div class="portal-desc">Full oversight of the entire platform. Review KYC, manage users, monitor every loan, configure platform fees, and keep the ecosystem healthy.</div>
+        <ul class="portal-features">
+          <li class="portal-feature">KYC approval queue</li>
+          <li class="portal-feature">Real-time loan monitoring</li>
+          <li class="portal-feature">User suspend / ban controls</li>
+          <li class="portal-feature">Platform revenue analytics</li>
+          <li class="portal-feature">Interest rate configuration</li>
+        </ul>
+        <a href="#" class="portal-cta admin-cta">Admin access →</a>
+      </div>
+      <div class="portal-card borrower-card sr sr-delay-2">
+        <div class="portal-glyph borrower-glyph">💳</div>
+        <div class="portal-role borrower-role">Borrower Portal</div>
+        <div class="portal-title">Borrow Smart</div>
+        <div class="portal-desc">Request money when you need it. See your credit score grow with every repayment. No judgment, no paperwork — just fast campus credit.</div>
+        <ul class="portal-features">
+          <li class="portal-feature">Loan request builder</li>
+          <li class="portal-feature">Live repayment calculator</li>
+          <li class="portal-feature">Credit score tracker</li>
+          <li class="portal-feature">One-tap UPI repayment</li>
+          <li class="portal-feature">Borrowing limit upgrades</li>
+        </ul>
+        <a href="#cta-section" class="portal-cta borrower-cta">Start borrowing →</a>
+      </div>
+      <div class="portal-card provider-card sr sr-delay-3">
+        <div class="portal-glyph provider-glyph">📈</div>
+        <div class="portal-role provider-role">Provider Portal</div>
+        <div class="portal-title">Earn Returns</div>
+        <div class="portal-desc">Put your idle money to work. Browse anonymous loan requests from verified campusmates, fund them, and earn returns — all tracked in real time.</div>
+        <ul class="portal-features">
+          <li class="portal-feature">Loan marketplace</li>
+          <li class="portal-feature">Anonymous borrower profiles</li>
+          <li class="portal-feature">Portfolio earnings tracker</li>
+          <li class="portal-feature">Risk & credit score filters</li>
+          <li class="portal-feature">UPI wallet & withdrawals</li>
+        </ul>
+        <a href="#cta-section" class="portal-cta provider-cta">Start earning →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── MONEY FLOW ── -->
+<section id="flow" class="story-section" style="padding-top:100px;padding-bottom:100px;">
+  <div class="flow-inner">
+    <div class="flow-header">
+      <div class="section-tag sr" style="justify-content:center;">The Money Flow</div>
+      <h2 class="story-headline sr sr-delay-1" style="text-align:center;">
+        Transparent by<br>design. <span style="color:var(--green)">Secure by default.</span>
+      </h2>
+    </div>
+
+    <div class="flow-diagram sr sr-delay-2">
+      <div class="flow-node">
+        <span class="flow-node-icon">📱</span>
+        <div class="flow-node-name">Provider</div>
+        <div class="flow-node-sub">Funds the loan</div>
+      </div>
+      <div class="flow-connector">
+        <div class="flow-label">UPI Transfer</div>
+        <div class="flow-label flow-label-bottom">₹ Principal</div>
+      </div>
+      <div class="flow-node" style="border-color:rgba(201,168,76,0.3);">
+        <span class="flow-node-icon">🔐</span>
+        <div class="flow-node-name">UniFi Escrow</div>
+        <div class="flow-node-sub">Holds & routes</div>
+      </div>
+      <div class="flow-connector">
+        <div class="flow-label">Instant Release</div>
+        <div class="flow-label flow-label-bottom">₹ To Borrower</div>
+      </div>
+      <div class="flow-node">
+        <span class="flow-node-icon">🎓</span>
+        <div class="flow-node-name">Borrower</div>
+        <div class="flow-node-sub">Receives money</div>
+      </div>
+    </div>
+
+    <div class="calc-card sr sr-delay-3">
+      <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);letter-spacing:0.15em;margin-bottom:20px;text-transform:uppercase;">Example — ₹2,000 loan for 30 days</div>
+      <div class="calc-row">
+        <span class="calc-label">Loan Principal</span>
+        <span class="calc-value">₹2,000</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">Interest (5% flat)</span>
+        <span class="calc-value" style="color:var(--gold)">₹100</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">Platform Fee (10% of interest)</span>
+        <span class="calc-value" style="color:var(--muted)">₹10</span>
+      </div>
+      <div class="calc-row">
+        <span class="calc-label">Provider earns</span>
+        <span class="calc-value" style="color:var(--green)">₹90 net</span>
+      </div>
+      <div class="calc-total">
+        <div>
+          <div class="calc-total-label">Borrower repays</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Principal + interest, one payment</div>
+        </div>
+        <div class="calc-total-value">₹2,100</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TRUST ── -->
+<section id="trust" class="story-section" style="padding-top:100px;padding-bottom:100px;">
+  <div class="trust-inner">
+    <div class="trust-header">
+      <div class="section-tag sr" style="justify-content:center;">Built for Trust</div>
+      <h2 class="story-headline sr sr-delay-1" style="text-align:center;">
+        We take your money<br><span style="color:var(--gold)">seriously.</span>
+      </h2>
+      <p style="text-align:center;color:var(--muted);font-size:0.9rem;max-width:400px;margin:16px auto 0;" class="sr sr-delay-2">Every layer of UniFi is built to protect both sides of every loan.</p>
+    </div>
+
+    <div class="trust-grid">
+      <div class="trust-card sr sr-delay-1">
+        <span class="trust-icon">🎓</span>
+        <div class="trust-title">Campus-Only Network</div>
+        <div class="trust-desc">Accessible only to students with verified university email IDs. No outsiders, no anonymity.</div>
+      </div>
+      <div class="trust-card sr sr-delay-2">
+        <span class="trust-icon">🔐</span>
+        <div class="trust-title">KYC Verification</div>
+        <div class="trust-desc">Every user's student ID is manually reviewed by our admin team before activation.</div>
+      </div>
+      <div class="trust-card sr sr-delay-3">
+        <span class="trust-icon">🔒</span>
+        <div class="trust-title">Escrow Protection</div>
+        <div class="trust-desc">Funds are never held by borrowers or providers directly. UniFi escrow routes all transactions via Razorpay.</div>
+      </div>
+      <div class="trust-card sr sr-delay-4">
+        <span class="trust-icon">📊</span>
+        <div class="trust-title">Credit Consequences</div>
+        <div class="trust-desc">Late repayments hit your UniFi credit score. Defaults freeze your account. This creates real accountability.</div>
+      </div>
+    </div>
+
+    <div class="testimonial-strip sr">
+      <div class="testimonials-track">
+        <div class="testimonial">
+          <div class="testimonial-text">"Mess fee emergency at 11pm, got funded by 11:32. I literally cried. This is what campus should feel like."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(201,168,76,0.1);">😊</div>
+            <div><div class="testimonial-name">UniFi #1847</div><div class="testimonial-meta">VIT Chennai · Borrower</div></div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-text">"I made ₹420 in interest last month on ₹8,000 I wasn't even using. That's more than my savings account."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(0,208,156,0.1);">🙌</div>
+            <div><div class="testimonial-name">UniFi #0394</div><div class="testimonial-meta">BITS Pilani · Provider</div></div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-text">"Finally a platform that treats students like adults. No calls from recovery agents, no shame. Just a clean repayment screen."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(76,142,255,0.1);">✌️</div>
+            <div><div class="testimonial-name">UniFi #2201</div><div class="testimonial-meta">SRM · Borrower</div></div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-text">"The anonymous loan marketplace is genius. I can see credit score, purpose, tenure — everything except who they are. Perfect balance."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(0,208,156,0.1);">💰</div>
+            <div><div class="testimonial-name">UniFi #0881</div><div class="testimonial-meta">Manipal · Provider</div></div>
+          </div>
+        </div>
+        <!-- Duplicate for infinite scroll -->
+        <div class="testimonial">
+          <div class="testimonial-text">"Mess fee emergency at 11pm, got funded by 11:32. I literally cried. This is what campus should feel like."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(201,168,76,0.1);">😊</div>
+            <div><div class="testimonial-name">UniFi #1847</div><div class="testimonial-meta">VIT Chennai · Borrower</div></div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-text">"I made ₹420 in interest last month on ₹8,000 I wasn't even using. That's more than my savings account."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(0,208,156,0.1);">🙌</div>
+            <div><div class="testimonial-name">UniFi #0394</div><div class="testimonial-meta">BITS Pilani · Provider</div></div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-text">"Finally a platform that treats students like adults. No calls from recovery agents, no shame. Just a clean repayment screen."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(76,142,255,0.1);">✌️</div>
+            <div><div class="testimonial-name">UniFi #2201</div><div class="testimonial-meta">SRM · Borrower</div></div>
+          </div>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-text">"The anonymous loan marketplace is genius. I can see credit score, purpose, tenure — everything except who they are. Perfect balance."</div>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background:rgba(0,208,156,0.1);">💰</div>
+            <div><div class="testimonial-name">UniFi #0881</div><div class="testimonial-meta">Manipal · Provider</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FINAL CTA ── -->
+<section id="cta-section">
+  <div class="cta-orb"></div>
+  <div class="cta-inner">
+    <div class="cta-eyebrow sr">JOIN THE CAMPUS CREDIT MOVEMENT</div>
+    <h2 class="cta-headline sr sr-delay-1">
+      Your campus<br>
+      <span style="color:var(--gold)">has your back.</span>
+    </h2>
+    <p class="cta-sub sr sr-delay-2">
+      Sign up with your university email. Get verified in hours. Borrow or lend — on your own terms, within your own network.
+    </p>
+    <div class="cta-buttons sr sr-delay-3">
+      <a href="#" class="btn-cta-borrow">I want to Borrow</a>
+      <a href="#" class="btn-cta-lend">I want to Earn</a>
+    </div>
+    <p class="cta-note sr sr-delay-4">
+      No credit history needed <span>·</span> University email required <span>·</span> Free to join
+    </p>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-logo">UniFi</div>
+  <div class="footer-note">© 2025 UniFi · Campus P2P Lending · Built with ❤️ for students</div>
+  <div class="footer-links">
+    <a href="#" class="footer-link">Privacy</a>
+    <a href="#" class="footer-link">Terms</a>
+    <a href="#" class="footer-link">Contact</a>
+    <a href="#" class="footer-link">Admin Login</a>
+  </div>
+</footer>
+
+<script>
+// ── Custom cursor ──
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+(function animCursor() {
+  rx += (mx - rx) * 0.15; ry += (my - ry) * 0.15;
+  cursor.style.left = mx + 'px'; cursor.style.top = my + 'px';
+  ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+  requestAnimationFrame(animCursor);
+})();
+document.querySelectorAll('a, button, .portal-card, .step-card').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    cursor.style.width = '20px'; cursor.style.height = '20px';
+    ring.style.width = '60px'; ring.style.height = '60px';
+  });
+  el.addEventListener('mouseleave', () => {
+    cursor.style.width = '10px'; cursor.style.height = '10px';
+    ring.style.width = '36px'; ring.style.height = '36px';
+  });
+});
+
+// ── Nav scroll ──
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 60);
+});
+
+// ── Scroll reveal ──
+const srObserver = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.12 });
+document.querySelectorAll('.sr').forEach(el => srObserver.observe(el));
+
+// ── Count-up animation ──
+function formatNum(val, prefix, suffix) {
+  let display;
+  if (val >= 1000000) display = '₹' + (val/1000000).toFixed(1) + 'Cr';
+  else if (val >= 1000) display = (prefix||'') + val.toLocaleString('en-IN');
+  else display = (prefix||'') + val;
+  return display + (suffix||'');
+}
+const counters = document.querySelectorAll('[data-target]');
+const countObserver = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    const el = e.target;
+    const target = +el.dataset.target;
+    const prefix = el.dataset.prefix || '';
+    const suffix = el.dataset.suffix || '';
+    let start = 0; const duration = 2000; const step = 16;
+    const inc = target / (duration / step);
+    const timer = setInterval(() => {
+      start = Math.min(start + inc, target);
+      el.textContent = formatNum(Math.floor(start), prefix, suffix);
+      if (start >= target) clearInterval(timer);
+    }, step);
+    countObserver.unobserve(el);
+  });
+}, { threshold: 0.5 });
+counters.forEach(c => countObserver.observe(c));
+
+// ── Smooth nav links ──
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+  });
+});
+</script>
+</body>
+</html>

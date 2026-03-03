@@ -1,0 +1,517 @@
+// ============================================================
+//  UniFi — Prisma Database Schema
+//  Database: PostgreSQL
+//  ORM: Prisma
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+//  ENUMS
+// ============================================================
+
+enum Role {
+  SUPER_ADMIN
+  MOD_ADMIN
+  FINANCE_ADMIN
+  BORROWER
+  PROVIDER
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LoanStatus {
+  PENDING          // Waiting for a provider to fund
+  FUNDED           // Provider accepted, waiting for disbursal
+  ACTIVE           // Money disbursed to borrower
+  REPAID           // Borrower repaid in full
+  DEFAULTED        // Past due date, not repaid
+  CANCELLED        // No provider within 24h / borrower cancelled
+}
+
+enum TransactionType {
+  DISBURSEMENT     // UniFi → Borrower (after provider funds escrow)
+  REPAYMENT        // Borrower → UniFi Escrow
+  PROVIDER_PAYOUT  // UniFi Escrow → Provider (after repayment)
+  PLATFORM_FEE     // UniFi keeps this slice
+  REFUND           // Edge case: cancelled loan refund to provider
+}
+
+enum TransactionStatus {
+  INITIATED
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum LoanPurpose {
+  FOOD
+  BOOKS
+  TRANSPORT
+  MEDICAL
+  ACCOMMODATION
+  EMERGENCY
+  OTHER
+}
+
+enum Tenure {
+  SEVEN     // 7 days
+  FOURTEEN  // 14 days
+  THIRTY    // 30 days
+}
+
+enum NotificationType {
+  LOAN_FUNDED
+  LOAN_DISBURSED
+  REPAYMENT_DUE
+  REPAYMENT_SUCCESS
+  REPAYMENT_OVERDUE
+  KYC_APPROVED
+  KYC_REJECTED
+  ACCOUNT_SUSPENDED
+  CREDIT_SCORE_UPDATED
+  GENERAL
+}
+
+enum AuditAction {
+  USER_CREATED
+  USER_SUSPENDED
+  USER_BANNED
+  USER_RESTORED
+  KYC_REVIEWED
+  LOAN_CREATED
+  LOAN_FUNDED
+  LOAN_CANCELLED
+  LOAN_DEFAULTED_FLAGGED
+  PAYMENT_INITIATED
+  PAYMENT_CONFIRMED
+  PLATFORM_CONFIG_CHANGED
+  ADMIN_LOGIN
+  ADMIN_CREATED
+  ADMIN_REVOKED
+}
+
+// ============================================================
+//  UNIVERSITY
+//  Seed with known universities; used to validate email domains
+// ============================================================
+
+model University {
+  id           String   @id @default(cuid())
+  name         String
+  shortName    String   // e.g. "VIT", "BITS"
+  emailDomain  String   @unique  // e.g. "vitstudent.ac.in"
+  city         String
+  state        String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  users        User[]
+
+  @@index([emailDomain])
+  @@map("universities")
+}
+
+// ============================================================
+//  USER
+//  Single table for all roles. Role field determines access.
+// ============================================================
+
+model User {
+  id               String     @id @default(cuid())
+  email            String
+  passwordHash     String
+  role             Role       @default(BORROWER)
+  firstName        String
+  lastName         String
+  phone            String?
+
+  // University linkage
+  universityId     String?
+  university       University? @relation(fields: [universityId], references: [id])
+  studentIdNumber  String?    // Their enrollment/roll number
+
+  // KYC
+  kycStatus        KycStatus  @default(PENDING)
+  kycReviewedAt    DateTime?
+  kycReviewedById  String?    // Admin user ID who reviewed
+  kycRejectReason  String?
+
+  // UPI
+  upiId            String?    // AES-256 encrypted at app layer before storing
+  upiVerified      Boolean    @default(false)
+
+  // Credit Score (300–900, starts at 500)
+  creditScore      Int        @default(500)
+  borrowLimit      Int        @default(5000)   // in ₹, upgrades with score
+
+  // Account state
+  isActive         Boolean    @default(true)
+  isSuspended      Boolean    @default(false)
+  isBanned         Boolean    @default(false)
+  suspendReason    String?
+  emailVerified    Boolean    @default(false)
+
+  // Timestamps
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  lastLoginAt      DateTime?
+
+  // Relations
+  kycDocument      KycDocument?
+  borrowerLoans    Loan[]     @relation("BorrowerLoans")
+  providerLoans    Loan[]     @relation("ProviderLoans")
+  transactions     Transaction[]
+  notifications    Notification[]
+  refreshTokens    RefreshToken[]
+  otpCodes         OtpCode[]
+  creditHistory    CreditScoreHistory[]
+  deviceSessions   DeviceSession[]
+  auditActionsBy   AuditLog[] @relation("AdminAuditLogs")
+
+  @@index([email])
+  @@unique([email, role])
+  @@index([phone])
+  @@index([role])
+  @@index([kycStatus])
+  @@index([universityId])
+  @@map("users")
+}
+
+// ============================================================
+//  KYC DOCUMENT
+//  Student ID image + selfie stored as S3/R2 keys (never public URLs)
+// ============================================================
+
+model KycDocument {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  studentIdFrontKey  String    // S3/R2 object key
+  studentIdBackKey   String?   // optional back side
+  selfieKey          String    // live selfie
+
+  submittedAt        DateTime  @default(now())
+  reviewedAt         DateTime?
+  adminNotes         String?   // Internal admin notes
+
+  @@map("kyc_documents")
+}
+
+// ============================================================
+//  OTP CODES
+//  Email verification + login OTP
+// ============================================================
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code       String   // 6-digit hashed
+  purpose    String   // "EMAIL_VERIFY" | "LOGIN" | "UPI_VERIFY"
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, purpose])
+  @@map("otp_codes")
+}
+
+// ============================================================
+//  REFRESH TOKENS
+//  JWT rotation — one active refresh token per device
+// ============================================================
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique  // SHA-256 hash of the actual token
+  deviceId    String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+//  DEVICE SESSIONS
+//  Fingerprint-based fraud check: same device = same person
+// ============================================================
+
+model DeviceSession {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerprint String   // Browser/device fingerprint hash
+  ipAddress   String
+  userAgent   String
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, fingerprint])
+  @@index([fingerprint])
+  @@map("device_sessions")
+}
+
+// ============================================================
+//  PLATFORM CONFIG
+//  Admin-editable settings: interest rates, fees, limits
+// ============================================================
+
+model PlatformConfig {
+  id                    String   @id @default(cuid())
+
+  // Interest
+  interestRatePercent   Decimal  @default(5.0)   // 5% flat per loan
+  // Fee
+  platformFeePercent    Decimal  @default(10.0)  // 10% of interest amount
+
+  // Loan limits (in ₹)
+  minLoanAmount         Int      @default(500)
+  maxLoanAmount         Int      @default(10000)
+
+  // Credit score borrow limits
+  scoreTier1MinScore    Int      @default(300)
+  scoreTier1Limit       Int      @default(2000)   // ₹
+  scoreTier2MinScore    Int      @default(600)
+  scoreTier2Limit       Int      @default(5000)
+  scoreTier3MinScore    Int      @default(750)
+  scoreTier3Limit       Int      @default(10000)
+
+  // Time limits
+  providerAcceptWindowHours  Int @default(24)  // Loan cancelled if unfunded in 24h
+  providerFundWindowHours    Int @default(2)   // Provider must pay within 2h of accepting
+
+  // Effective from (allows scheduling config changes)
+  effectiveFrom         DateTime @default(now())
+  createdByAdminId      String
+  createdAt             DateTime @default(now())
+
+  @@map("platform_config")
+}
+
+// ============================================================
+//  LOAN
+//  Core entity. Links borrower ↔ provider.
+// ============================================================
+
+model Loan {
+  id               String      @id @default(cuid())
+
+  // Parties
+  borrowerId       String
+  borrower         User        @relation("BorrowerLoans", fields: [borrowerId], references: [id])
+  providerId       String?     // Null until a provider funds it
+  provider         User?       @relation("ProviderLoans", fields: [providerId], references: [id])
+
+  // Loan terms
+  principalAmount  Int         // in ₹ (paise avoided for simplicity)
+  interestAmount   Int         // computed at creation: principal * rate
+  platformFeeAmount Int        // computed: interestAmount * fee%
+  totalRepayAmount Int         // principal + interestAmount
+  providerEarning  Int         // interestAmount - platformFeeAmount
+
+  interestRate     Decimal     // snapshot of rate at time of creation
+  platformFeeRate  Decimal     // snapshot of fee at time of creation
+  tenure           Tenure
+
+  // Purpose & display
+  purpose          LoanPurpose @default(OTHER)
+  purposeNote      String?     // Optional one-liner from borrower
+
+  // Anonymised ID shown in marketplace (e.g. "UniFi#2847")
+  publicId         String      @unique
+
+  // Status lifecycle
+  status           LoanStatus  @default(PENDING)
+
+  // Key timestamps
+  requestedAt      DateTime    @default(now())
+  fundedAt         DateTime?   // Provider accepted + paid escrow
+  disbursedAt      DateTime?   // Borrower received money
+  dueAt            DateTime?   // Computed: disbursedAt + tenure days
+  repaidAt         DateTime?
+  cancelledAt      DateTime?
+  defaultedAt      DateTime?
+
+  // Razorpay references
+  rzpOrderId       String?     // Razorpay order ID for provider payment
+  rzpPaymentId     String?     // Razorpay payment ID (provider → escrow)
+  rzpRepayOrderId  String?     // Razorpay order for repayment
+  rzpRepayPaymentId String?
+
+  // Late tracking
+  isOverdue        Boolean     @default(false)
+  overdueDays      Int         @default(0)
+  lateFeeAmount    Int         @default(0)
+
+  // Soft delete / archive
+  isArchived       Boolean     @default(false)
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  transactions     Transaction[]
+
+  @@index([borrowerId])
+  @@index([providerId])
+  @@index([status])
+  @@index([publicId])
+  @@index([dueAt])
+  @@index([requestedAt])
+  @@map("loans")
+}
+
+// ============================================================
+//  TRANSACTION
+//  Immutable ledger. Every money movement gets a row.
+//  Never update — only insert. Source of truth for finance.
+// ============================================================
+
+model Transaction {
+  id               String            @id @default(cuid())
+  loanId           String
+  loan             Loan              @relation(fields: [loanId], references: [id])
+  userId           String            // Who initiated / who is affected
+  user             User              @relation(fields: [userId], references: [id])
+
+  type             TransactionType
+  status           TransactionStatus @default(INITIATED)
+  amount           Int               // in ₹
+
+  // Razorpay
+  rzpOrderId       String?
+  rzpPaymentId     String?
+  rzpSignature     String?           // Webhook signature for verification
+  rzpRefId         String?           // Razorpay reference ID
+
+  // Idempotency
+  idempotencyKey   String            @unique  // Prevents duplicate charges
+
+  // Metadata
+  description      String?
+  failureReason    String?
+  reversedAt       DateTime?
+
+  initiatedAt      DateTime          @default(now())
+  completedAt      DateTime?
+
+  @@index([loanId])
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([rzpPaymentId])
+  @@index([idempotencyKey])
+  @@map("transactions")
+}
+
+// ============================================================
+//  CREDIT SCORE HISTORY
+//  Every change to a user's score is recorded
+// ============================================================
+
+model CreditScoreHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  previousScore Int
+  newScore      Int
+  delta         Int    // positive = improved, negative = dropped
+  reason        String // e.g. "On-time repayment", "Defaulted loan", "Account age"
+  loanId        String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("credit_score_history")
+}
+
+// ============================================================
+//  NOTIFICATION
+//  In-app + push notification log
+// ============================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  data      Json?            // Extra payload (loanId, amount, etc.)
+
+  createdAt DateTime         @default(now())
+  readAt    DateTime?
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ============================================================
+//  AUDIT LOG
+//  Immutable. Every admin action recorded. Non-deletable.
+// ============================================================
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  adminId     String
+  admin       User        @relation("AdminAuditLogs", fields: [adminId], references: [id])
+
+  action      AuditAction
+  targetType  String      // "User" | "Loan" | "Transaction" | "Config"
+  targetId    String      // ID of the affected record
+  description String
+  metadata    Json?       // Before/after values for config changes
+
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime    @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+//  RATE LIMIT LOG
+//  Redis handles runtime limiting; this is the persistent record
+//  for security audits of suspicious IPs
+// ============================================================
+
+model RateLimitLog {
+  id         String   @id @default(cuid())
+  identifier String   // IP or userId
+  endpoint   String
+  hitCount   Int      @default(1)
+  windowStart DateTime
+  blocked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+  @@index([windowStart])
+  @@map("rate_limit_logs")
+}

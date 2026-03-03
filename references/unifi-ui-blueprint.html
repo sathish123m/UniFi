@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniFi — UI Design Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #07070A;
+    --surface: #0F0F16;
+    --card: #14141E;
+    --card2: #1A1A28;
+    --border: rgba(255,255,255,0.07);
+    --gold: #C9A84C;
+    --gold-dim: rgba(201,168,76,0.15);
+    --green: #00D09C;
+    --green-dim: rgba(0,208,156,0.12);
+    --red: #FF5C5C;
+    --blue: #4C8EFF;
+    --text: #F0F0F8;
+    --muted: #6B6B80;
+    --subtle: #2A2A3E;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(7,7,10,0.92);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+  }
+  .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--gold); letter-spacing: 0.05em; }
+  .nav-logo span { color: var(--text); }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 6px 18px; border-radius: 20px; font-size: 0.82rem; font-weight: 500;
+    cursor: pointer; transition: all 0.2s; border: none; background: transparent; color: var(--muted);
+  }
+  .nav-tab.active { background: var(--gold); color: #000; }
+  .nav-tab:hover:not(.active) { color: var(--text); background: var(--subtle); }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 80px 48px 60px;
+    background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(201,168,76,0.08) 0%, transparent 70%);
+    border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,208,156,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--gold-dim); border: 1px solid rgba(201,168,76,0.3);
+    padding: 5px 14px; border-radius: 20px;
+    font-size: 0.75rem; color: var(--gold); font-weight: 500; margin-bottom: 20px;
+  }
+  .hero-badge::before { content: '●'; font-size: 0.5rem; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .hero h1 { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; line-height: 1.1; margin-bottom: 16px; }
+  .hero h1 .gold { color: var(--gold); }
+  .hero p { color: var(--muted); font-size: 1rem; max-width: 560px; }
+
+  /* ── SECTION ── */
+  .section { padding: 60px 48px; border-bottom: 1px solid var(--border); }
+  .section-header { display: flex; align-items: center; gap: 16px; margin-bottom: 40px; }
+  .section-num { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--gold); background: var(--gold-dim); padding: 3px 10px; border-radius: 4px; }
+  .section-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 700; }
+  .section-sub { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+  /* ── COLOUR PALETTE ── */
+  .palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+  .swatch {
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .swatch-color { height: 80px; }
+  .swatch-info { padding: 12px 14px; background: var(--card); }
+  .swatch-name { font-size: 0.82rem; font-weight: 600; }
+  .swatch-hex { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .swatch-use { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── TYPOGRAPHY ── */
+  .type-grid { display: grid; gap: 20px; }
+  .type-row { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px 28px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .type-sample { flex: 1; }
+  .type-meta { text-align: right; }
+  .type-label { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+  .type-spec { font-size: 0.78rem; color: var(--gold); margin-top: 4px; }
+  .t-display { font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800; color: var(--text); }
+  .t-heading { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; }
+  .t-subhead { font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 500; color: var(--muted); }
+  .t-body { font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--muted); }
+  .t-mono { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--green); }
+  .t-amount { font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800; color: var(--green); }
+
+  /* ── ICONOGRAPHY ── */
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
+  .icon-item {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px 12px; text-align: center; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .icon-item:hover { border-color: var(--gold); background: var(--gold-dim); }
+  .icon-emoji { font-size: 1.8rem; display: block; margin-bottom: 8px; }
+  .icon-name { font-size: 0.68rem; color: var(--muted); }
+
+  /* ── SCREEN CARDS ── */
+  .screens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+  .screen-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+    overflow: hidden; cursor: pointer; transition: all 0.3s;
+    position: relative;
+  }
+  .screen-card:hover { border-color: var(--gold); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(201,168,76,0.08); }
+  .screen-tag {
+    position: absolute; top: 16px; right: 16px; z-index: 2;
+    padding: 4px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 600;
+  }
+  .tag-admin { background: rgba(76,142,255,0.2); color: var(--blue); border: 1px solid rgba(76,142,255,0.3); }
+  .tag-borrower { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+  .tag-provider { background: rgba(0,208,156,0.12); color: var(--green); border: 1px solid rgba(0,208,156,0.3); }
+  .tag-shared { background: var(--subtle); color: var(--muted); border: 1px solid var(--border); }
+
+  .screen-mockup { height: 200px; position: relative; overflow: hidden; }
+  .screen-info { padding: 20px; }
+  .screen-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+  .screen-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+  .screen-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip { background: var(--subtle); padding: 3px 10px; border-radius: 20px; font-size: 0.68rem; color: var(--muted); }
+
+  /* ── MOCKUPS ── */
+
+  /* Landing */
+  .mock-landing {
+    background: linear-gradient(135deg, #07070A 0%, #0F0F16 100%);
+    padding: 20px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .mock-nav-bar { height: 28px; background: rgba(255,255,255,0.04); border-radius: 6px; display: flex; align-items: center; padding: 0 10px; gap: 8px; }
+  .mock-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .mock-hero-text { height: 16px; width: 70%; background: linear-gradient(90deg, #C9A84C, #F0D885); border-radius: 4px; }
+  .mock-hero-sub { height: 8px; width: 50%; background: rgba(255,255,255,0.1); border-radius: 4px; }
+  .mock-cta-row { display: flex; gap: 8px; margin-top: 4px; }
+  .mock-btn-gold { height: 24px; width: 80px; background: var(--gold); border-radius: 20px; }
+  .mock-btn-ghost { height: 24px; width: 80px; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; }
+  .mock-cards-row { display: flex; gap: 8px; margin-top: 6px; }
+  .mock-stat-card { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 8px; }
+  .mock-stat-num { height: 14px; width: 60%; background: rgba(0,208,156,0.5); border-radius: 3px; margin-bottom: 4px; }
+  .mock-stat-label { height: 7px; width: 80%; background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+  /* Onboarding */
+  .mock-onboard {
+    background: var(--surface);
+    padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .mock-step-row { display: flex; gap: 6px; align-items: center; }
+  .mock-step { width: 20px; height: 4px; border-radius: 4px; }
+  .mock-avatar-circle { width: 50px; height: 50px; border-radius: 50%; background: var(--gold-dim); border: 2px solid var(--gold); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+  .mock-input-field { width: 100%; height: 28px; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; }
+  .mock-input-active { border-color: var(--gold) !important; }
+
+  /* Dashboard */
+  .mock-dashboard { background: var(--surface); display: flex; height: 100%; }
+  .mock-sidebar { width: 40px; background: var(--card); border-right: 1px solid var(--border); padding: 10px 6px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .mock-sidebar-icon { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,0.04); }
+  .mock-sidebar-icon.active { background: var(--gold-dim); border: 1px solid rgba(201,168,76,0.4); }
+  .mock-main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .mock-top-row { display: flex; gap: 8px; }
+  .mock-big-card { flex: 2; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .mock-small-card { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px; }
+  .mock-amount-big { height: 18px; width: 70%; background: linear-gradient(90deg, rgba(0,208,156,0.6), rgba(0,208,156,0.2)); border-radius: 4px; margin-bottom: 5px; }
+  .mock-label-sm { height: 7px; width: 50%; background: rgba(255,255,255,0.08); border-radius: 3px; }
+  .mock-list { display: flex; flex-direction: column; gap: 5px; }
+  .mock-list-row { height: 20px; background: var(--card2); border-radius: 6px; display: flex; align-items: center; padding: 0 8px; gap: 6px; }
+  .mock-list-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .mock-list-line { height: 6px; flex: 1; background: rgba(255,255,255,0.07); border-radius: 3px; }
+  .mock-list-amt { height: 6px; width: 30px; border-radius: 3px; }
+  .mock-progress-bar { height: 6px; width: 100%; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .mock-progress-fill { height: 100%; border-radius: 4px; }
+
+  /* Admin */
+  .mock-admin { background: #080810; display: flex; height: 100%; }
+  .mock-admin-sidebar { width: 50px; background: #0D0D18; border-right: 1px solid rgba(76,142,255,0.1); padding: 8px 6px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .mock-admin-icon { width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.03); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+  .mock-admin-icon.act { background: rgba(76,142,255,0.15); border: 1px solid rgba(76,142,255,0.3); }
+  .mock-admin-main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .mock-stat-row { display: flex; gap: 6px; }
+  .mock-stat-box { flex: 1; background: #0D0D18; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; }
+  .mock-table { background: #0D0D18; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; }
+  .mock-thead { display: flex; gap: 6px; padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .mock-th { height: 6px; flex: 1; background: rgba(255,255,255,0.06); border-radius: 3px; }
+  .mock-tr { display: flex; gap: 6px; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .mock-td { height: 5px; flex: 1; border-radius: 3px; }
+
+  /* Loan Marketplace */
+  .mock-market { background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .mock-market-header { display: flex; justify-content: space-between; align-items: center; }
+  .mock-market-title { height: 14px; width: 120px; background: rgba(255,255,255,0.12); border-radius: 4px; }
+  .mock-filter-row { display: flex; gap: 6px; }
+  .mock-filter-chip { height: 22px; padding: 0 10px; border-radius: 20px; display: flex; align-items: center; font-size: 0.6rem; }
+  .mock-loan-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+  .mock-loan-row1 { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .mock-borrower-id { height: 8px; width: 80px; background: rgba(255,255,255,0.1); border-radius: 3px; }
+  .mock-loan-amt { height: 14px; width: 60px; background: rgba(0,208,156,0.4); border-radius: 4px; }
+  .mock-loan-meta { display: flex; gap: 10px; }
+  .mock-meta-pill { height: 16px; width: 50px; border-radius: 20px; background: rgba(255,255,255,0.05); }
+  .mock-loan-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .mock-return { height: 8px; width: 70px; background: rgba(201,168,76,0.3); border-radius: 3px; }
+  .mock-fund-btn { height: 22px; width: 60px; background: var(--green); border-radius: 20px; }
+
+  /* Credit Score */
+  .mock-credit { background: var(--surface); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .mock-score-ring { width: 80px; height: 80px; border-radius: 50%; background: conic-gradient(var(--green) 0% 75%, rgba(255,255,255,0.06) 75% 100%); display: flex; align-items: center; justify-content: center; position: relative; }
+  .mock-score-inner { width: 60px; height: 60px; border-radius: 50%; background: var(--surface); display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 800; color: var(--green); }
+  .mock-score-label { height: 8px; width: 100px; background: rgba(255,255,255,0.08); border-radius: 4px; }
+  .mock-factors { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+  .mock-factor-row { display: flex; align-items: center; gap: 8px; }
+  .mock-factor-label { height: 7px; flex: 1; background: rgba(255,255,255,0.07); border-radius: 3px; }
+  .mock-factor-bar { height: 6px; flex: 2; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .mock-factor-fill { height: 100%; border-radius: 3px; }
+
+  /* ── MOTION SECTION ── */
+  .motion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .motion-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 24px; display: flex; flex-direction: column; gap: 10px;
+    transition: all 0.3s;
+  }
+  .motion-card:hover { border-color: var(--gold); }
+  .motion-icon { font-size: 1.8rem; }
+  .motion-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; }
+  .motion-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── COMPONENT LIBRARY ── */
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+  .comp-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px; }
+  .comp-label { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Buttons */
+  .btn-primary { background: var(--gold); color: #000; border: none; padding: 10px 24px; border-radius: 24px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+  .btn-primary:hover { background: #D4B460; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(201,168,76,0.3); }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); padding: 10px 24px; border-radius: 24px; font-weight: 500; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+  .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-success { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,208,156,0.3); padding: 10px 24px; border-radius: 24px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+  .btn-danger { background: rgba(255,92,92,0.1); color: var(--red); border: 1px solid rgba(255,92,92,0.2); padding: 10px 24px; border-radius: 24px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* Status Badges */
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .badge-active { background: var(--green-dim); color: var(--green); border: 1px solid rgba(0,208,156,0.3); }
+  .badge-pending { background: rgba(201,168,76,0.1); color: var(--gold); border: 1px solid rgba(201,168,76,0.25); }
+  .badge-repaid { background: rgba(76,142,255,0.1); color: var(--blue); border: 1px solid rgba(76,142,255,0.25); }
+  .badge-default { background: rgba(255,92,92,0.1); color: var(--red); border: 1px solid rgba(255,92,92,0.25); }
+  .badge-review { background: var(--subtle); color: var(--muted); border: 1px solid var(--border); }
+
+  /* Stat Card */
+  .stat-comp { background: var(--card2); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+  .stat-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .stat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+  .stat-change { font-size: 0.72rem; font-weight: 600; }
+  .stat-change.up { color: var(--green); }
+  .stat-change.down { color: var(--red); }
+  .stat-num { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; }
+  .stat-lbl { font-size: 0.78rem; color: var(--muted); }
+
+  /* Input */
+  .input-demo { width: 100%; background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; color: var(--text); font-size: 0.9rem; font-family: 'DM Sans', sans-serif; outline: none; transition: border 0.2s; }
+  .input-demo:focus { border-color: var(--gold); }
+  .input-demo::placeholder { color: var(--muted); }
+  .input-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; display: block; }
+
+  /* Loan Card */
+  .loan-card-demo { background: var(--card2); border: 1px solid var(--border); border-radius: 16px; padding: 20px; }
+  .loan-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+  .loan-amount { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--green); }
+  .loan-meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .loan-meta-item { background: var(--subtle); padding: 4px 12px; border-radius: 20px; font-size: 0.72rem; color: var(--muted); }
+  .loan-progress { height: 6px; background: var(--subtle); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+  .loan-progress-fill { height: 100%; background: linear-gradient(90deg, var(--green), rgba(0,208,156,0.4)); border-radius: 4px; width: 65%; }
+  .loan-footer-row { display: flex; justify-content: space-between; align-items: center; }
+  .loan-due { font-size: 0.75rem; color: var(--muted); }
+  .loan-due span { color: var(--gold); font-weight: 500; }
+
+  /* ── IMAGES & VISUALS SECTION ── */
+  .visual-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+  .visual-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+  .visual-preview { height: 140px; display: flex; align-items: center; justify-content: center; font-size: 3rem; position: relative; }
+  .visual-info { padding: 16px; }
+  .visual-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+  .visual-desc { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+
+  /* Gradient previews */
+  .grad-1 { background: radial-gradient(ellipse at 30% 50%, rgba(201,168,76,0.25), rgba(0,208,156,0.1) 60%, transparent); }
+  .grad-2 { background: linear-gradient(135deg, rgba(76,142,255,0.15), rgba(201,168,76,0.1)); }
+  .grad-3 { background: radial-gradient(circle at 70% 30%, rgba(0,208,156,0.2), transparent 60%); }
+  .grad-4 { background: linear-gradient(180deg, rgba(201,168,76,0.08), transparent); }
+
+  /* ── LAYOUT SECTION ── */
+  .layout-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .layout-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+  .layout-preview { height: 180px; background: var(--surface); display: flex; position: relative; }
+  .layout-info { padding: 16px 20px; }
+  .layout-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+  .layout-desc { font-size: 0.78rem; color: var(--muted); }
+
+  /* Layout previews */
+  .lay-sidebar-preview { display: flex; width: 100%; height: 100%; }
+  .lay-sb { width: 35px; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); }
+  .lay-content { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .lay-top-nav { height: 20px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+  .lay-body { flex: 1; display: grid; grid-template-columns: 2fr 1fr; gap: 6px; }
+  .lay-main-area { background: rgba(255,255,255,0.02); border-radius: 6px; }
+  .lay-right-panel { background: rgba(255,255,255,0.02); border-radius: 6px; }
+
+  .lay-cards-preview { padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+  .lay-card-item { background: rgba(255,255,255,0.04); border-radius: 8px; }
+
+  .lay-split-preview { display: flex; width: 100%; height: 100%; }
+  .lay-half-1 { flex: 1; background: var(--black); display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+  .lay-half-2 { flex: 1; background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+
+  .lay-fullscreen-preview { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(201,168,76,0.08), transparent); font-size: 1.5rem; color: var(--gold); font-family: 'Syne', sans-serif; font-weight: 700; letter-spacing: 0.1em; }
+
+  /* ── USER JOURNEY ── */
+  .journey-tabs { display: flex; gap: 8px; margin-bottom: 32px; }
+  .j-tab { padding: 8px 20px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.2s; border: 1px solid var(--border); color: var(--muted); background: transparent; }
+  .j-tab.active-admin { background: rgba(76,142,255,0.15); color: var(--blue); border-color: rgba(76,142,255,0.4); }
+  .j-tab.active-borrower { background: var(--gold-dim); color: var(--gold); border-color: rgba(201,168,76,0.4); }
+  .j-tab.active-provider { background: var(--green-dim); color: var(--green); border-color: rgba(0,208,156,0.4); }
+  .journey-flow { display: flex; gap: 0; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .j-step {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 18px; min-width: 130px;
+  }
+  .j-step-num { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; }
+  .j-step-name { font-family: 'Syne', sans-serif; font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+  .j-step-desc { font-size: 0.7rem; color: var(--muted); }
+  .j-arrow { color: var(--muted); font-size: 1rem; padding: 0 2px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    nav { padding: 0 20px; }
+    .hero, .section { padding: 40px 20px; }
+    .hero h1 { font-size: 2rem; }
+    .layout-grid { grid-template-columns: 1fr; }
+    .nav-tabs { display: none; }
+  }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal { opacity: 0; transform: translateY(20px); transition: all 0.5s; }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── GLOW EFFECTS ── */
+  .glow-green { box-shadow: 0 0 30px rgba(0,208,156,0.15); }
+  .glow-gold { box-shadow: 0 0 30px rgba(201,168,76,0.15); }
+
+  /* Portal tabs */
+  .portal-wrapper { display: none; }
+  .portal-wrapper.active { display: block; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Uni<span>Fi</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="scrollTo('#colours')">Colours</button>
+    <button class="nav-tab" onclick="scrollTo('#typography')">Type</button>
+    <button class="nav-tab" onclick="scrollTo('#screens')">Screens</button>
+    <button class="nav-tab" onclick="scrollTo('#components')">Components</button>
+    <button class="nav-tab" onclick="scrollTo('#visuals')">Visuals</button>
+    <button class="nav-tab" onclick="scrollTo('#layout')">Layout</button>
+    <button class="nav-tab" onclick="scrollTo('#journey')">User Flow</button>
+  </div>
+  <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted)">UI BLUEPRINT v1.0</div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Design System — UniFi P2P Lending Platform</div>
+  <h1>Built to feel like <span class="gold">money</span>.<br>Designed to feel like <span class="gold">trust</span>.</h1>
+  <p>A complete UI blueprint for the UniFi platform — covering colour, typography, screens, components, imagery, and user flows across all three portals.</p>
+</div>
+
+<!-- 1. COLOURS -->
+<div class="section reveal" id="colours">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div>
+      <div class="section-title">Colour System</div>
+      <div class="section-sub">CRED-inspired dark luxury palette — black is the canvas, gold is the voice, green is the action</div>
+    </div>
+  </div>
+  <div class="palette-grid">
+    <div class="swatch">
+      <div class="swatch-color" style="background:#07070A"></div>
+      <div class="swatch-info"><div class="swatch-name">Void Black</div><div class="swatch-hex">#07070A</div><div class="swatch-use">App background</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#0F0F16"></div>
+      <div class="swatch-info"><div class="swatch-name">Deep Surface</div><div class="swatch-hex">#0F0F16</div><div class="swatch-use">Page sections</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#14141E"></div>
+      <div class="swatch-info"><div class="swatch-name">Card Dark</div><div class="swatch-hex">#14141E</div><div class="swatch-use">Primary cards</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#1A1A28"></div>
+      <div class="swatch-info"><div class="swatch-name">Card Raised</div><div class="swatch-hex">#1A1A28</div><div class="swatch-use">Elevated cards</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#C9A84C"></div>
+      <div class="swatch-info"><div class="swatch-name">UniFi Gold</div><div class="swatch-hex">#C9A84C</div><div class="swatch-use">Primary brand, CTAs</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#F0D885"></div>
+      <div class="swatch-info"><div class="swatch-name">Gold Light</div><div class="swatch-hex">#F0D885</div><div class="swatch-use">Hover states, highlights</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#00D09C"></div>
+      <div class="swatch-info"><div class="swatch-name">Mint Green</div><div class="swatch-hex">#00D09C</div><div class="swatch-use">Amounts, success, CTAs</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#4C8EFF"></div>
+      <div class="swatch-info"><div class="swatch-name">Admin Blue</div><div class="swatch-hex">#4C8EFF</div><div class="swatch-use">Admin portal accent</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#FF5C5C"></div>
+      <div class="swatch-info"><div class="swatch-name">Alert Red</div><div class="swatch-hex">#FF5C5C</div><div class="swatch-use">Errors, defaults</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#FF9F43"></div>
+      <div class="swatch-info"><div class="swatch-name">Warning Amber</div><div class="swatch-hex">#FF9F43</div><div class="swatch-use">Due soon, warnings</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#6B6B80"></div>
+      <div class="swatch-info"><div class="swatch-name">Muted</div><div class="swatch-hex">#6B6B80</div><div class="swatch-use">Secondary text</div></div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#2A2A3E"></div>
+      <div class="swatch-info"><div class="swatch-name">Subtle</div><div class="swatch-hex">#2A2A3E</div><div class="swatch-use">Chips, tags</div></div>
+    </div>
+  </div>
+  <div style="margin-top:32px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 24px;">
+    <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.08em;">Portal Colour Identity</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+      <div style="background: rgba(76,142,255,0.06); border: 1px solid rgba(76,142,255,0.2); border-radius:14px; padding:16px; text-align:center;">
+        <div style="font-size:1.5rem;margin-bottom:8px;">🛡️</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--blue);font-size:0.9rem;">ADMIN</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Blue accent — authority, control, oversight</div>
+      </div>
+      <div style="background: rgba(201,168,76,0.06); border: 1px solid rgba(201,168,76,0.2); border-radius:14px; padding:16px; text-align:center;">
+        <div style="font-size:1.5rem;margin-bottom:8px;">💳</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--gold);font-size:0.9rem;">BORROWER</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Gold accent — aspiration, trust, borrowing power</div>
+      </div>
+      <div style="background: rgba(0,208,156,0.06); border: 1px solid rgba(0,208,156,0.2); border-radius:14px; padding:16px; text-align:center;">
+        <div style="font-size:1.5rem;margin-bottom:8px;">📈</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--green);font-size:0.9rem;">PROVIDER</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Green accent — growth, earnings, returns</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. TYPOGRAPHY -->
+<div class="section reveal" id="typography">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">Typography</div>
+      <div class="section-sub">Syne for bold financial punch. DM Sans for readable clarity. DM Mono for data precision.</div>
+    </div>
+  </div>
+  <div class="type-grid">
+    <div class="type-row">
+      <div class="type-sample"><div class="t-display">UniFi. Borrow Bold.</div></div>
+      <div class="type-meta"><div class="type-label">Display / Hero</div><div class="type-spec">Syne 800 · 48px</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-sample"><div class="t-heading">Your Credit Score</div></div>
+      <div class="type-meta"><div class="type-label">Section Heading</div><div class="type-spec">Syne 700 · 28px</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-sample"><div class="t-amount">₹12,500.00</div></div>
+      <div class="type-meta"><div class="type-label">Amount Display</div><div class="type-spec">Syne 800 · 32px · Green</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-sample"><div class="t-subhead">Choose your repayment tenure carefully</div></div>
+      <div class="type-meta"><div class="type-label">Subheading</div><div class="type-spec">DM Sans 500 · 16px</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-sample"><div class="t-body">Your loan request is visible to all verified providers in your university network. Once a provider accepts, funds are transferred within 30 minutes.</div></div>
+      <div class="type-meta"><div class="type-label">Body Text</div><div class="type-spec">DM Sans 400 · 14px</div></div>
+    </div>
+    <div class="type-row">
+      <div class="type-sample"><div class="t-mono">TXN#UF-2024-00847 · UPI: success</div></div>
+      <div class="type-meta"><div class="type-label">Data / Mono</div><div class="type-spec">DM Mono 400 · 13px · Green</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. SCREENS -->
+<div class="section reveal" id="screens">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div>
+      <div class="section-title">Screen Inventory</div>
+      <div class="section-sub">Every screen across all three portals — with mockup previews</div>
+    </div>
+  </div>
+  <div class="screens-grid">
+
+    <!-- Landing Page -->
+    <div class="screen-card">
+      <div class="screen-tag tag-shared">SHARED</div>
+      <div class="screen-mockup">
+        <div class="mock-landing" style="height:100%">
+          <div class="mock-nav-bar">
+            <div class="mock-dot" style="background:var(--gold)"></div>
+            <div style="flex:1;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;"></div>
+            <div class="mock-btn-gold" style="height:16px;width:50px;border-radius:10px;background:var(--gold)"></div>
+          </div>
+          <div class="mock-hero-text"></div>
+          <div style="height:8px;width:40%;background:linear-gradient(90deg,#00D09C,rgba(0,208,156,0.3));border-radius:4px;"></div>
+          <div class="mock-hero-sub"></div>
+          <div class="mock-cta-row">
+            <div class="mock-btn-gold"></div>
+            <div class="mock-btn-ghost"></div>
+          </div>
+          <div class="mock-cards-row">
+            <div class="mock-stat-card"><div class="mock-stat-num"></div><div class="mock-stat-label"></div></div>
+            <div class="mock-stat-card"><div class="mock-stat-num" style="background:rgba(201,168,76,0.5)"></div><div class="mock-stat-label"></div></div>
+            <div class="mock-stat-card"><div class="mock-stat-num" style="background:rgba(76,142,255,0.5)"></div><div class="mock-stat-label"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Landing Page</div>
+        <div class="screen-desc">Full-screen hero with animated counter stats. "Borrow within your campus." CTAs to join as borrower or provider. University trust badges.</div>
+        <div class="screen-chips"><span class="chip">Hero Section</span><span class="chip">How It Works</span><span class="chip">Stats</span><span class="chip">Sign Up CTA</span></div>
+      </div>
+    </div>
+
+    <!-- Onboarding -->
+    <div class="screen-card">
+      <div class="screen-tag tag-shared">SHARED</div>
+      <div class="screen-mockup">
+        <div class="mock-onboard" style="height:100%">
+          <div class="mock-step-row">
+            <div class="mock-step" style="background:var(--gold)"></div>
+            <div class="mock-step" style="background:var(--gold)"></div>
+            <div class="mock-step" style="background:rgba(255,255,255,0.1)"></div>
+            <div class="mock-step" style="background:rgba(255,255,255,0.1)"></div>
+          </div>
+          <div class="mock-avatar-circle">🎓</div>
+          <div style="height:8px;width:120px;background:rgba(255,255,255,0.1);border-radius:4px;"></div>
+          <div class="mock-input-field"></div>
+          <div class="mock-input-field mock-input-active"></div>
+          <div class="mock-btn-gold" style="width:100%;border-radius:8px;"></div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Onboarding Flow</div>
+        <div class="screen-desc">4-step wizard: University email → OTP verify → Role select (Borrower/Provider) → KYC upload → UPI link. Progress bar at top.</div>
+        <div class="screen-chips"><span class="chip">Step 1: Email OTP</span><span class="chip">Step 2: Role</span><span class="chip">Step 3: KYC</span><span class="chip">Step 4: UPI</span></div>
+      </div>
+    </div>
+
+    <!-- Borrower Dashboard -->
+    <div class="screen-card">
+      <div class="screen-tag tag-borrower">BORROWER</div>
+      <div class="screen-mockup">
+        <div class="mock-dashboard" style="height:100%">
+          <div class="mock-sidebar">
+            <div class="mock-sidebar-icon active">🏠</div>
+            <div class="mock-sidebar-icon">💳</div>
+            <div class="mock-sidebar-icon">📊</div>
+            <div class="mock-sidebar-icon">🔔</div>
+          </div>
+          <div class="mock-main">
+            <div class="mock-top-row">
+              <div class="mock-big-card">
+                <div style="height:7px;width:80px;background:rgba(255,255,255,0.07);border-radius:3px;margin-bottom:6px;"></div>
+                <div class="mock-amount-big"></div>
+                <div class="mock-label-sm"></div>
+                <div class="mock-progress-bar"><div class="mock-progress-fill" style="background:linear-gradient(90deg,var(--gold),rgba(201,168,76,0.3));width:45%"></div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="mock-small-card"><div class="mock-stat-num" style="background:rgba(201,168,76,0.4)"></div><div class="mock-label-sm"></div></div>
+                <div class="mock-small-card"><div class="mock-stat-num" style="background:rgba(76,142,255,0.4)"></div><div class="mock-label-sm"></div></div>
+              </div>
+            </div>
+            <div class="mock-list">
+              <div class="mock-list-row"><div class="mock-list-dot" style="background:var(--green)"></div><div class="mock-list-line"></div><div class="mock-list-amt" style="background:rgba(0,208,156,0.4)"></div></div>
+              <div class="mock-list-row"><div class="mock-list-dot" style="background:var(--gold)"></div><div class="mock-list-line"></div><div class="mock-list-amt" style="background:rgba(201,168,76,0.4)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Borrower Dashboard</div>
+        <div class="screen-desc">Credit score ring at top. Active loan card with repayment countdown. Quick action buttons: "Borrow" and "Repay". Recent transactions list.</div>
+        <div class="screen-chips"><span class="chip">Credit Ring</span><span class="chip">Active Loan</span><span class="chip">Quick Actions</span><span class="chip">History</span></div>
+      </div>
+    </div>
+
+    <!-- Loan Request -->
+    <div class="screen-card">
+      <div class="screen-tag tag-borrower">BORROWER</div>
+      <div class="screen-mockup">
+        <div class="mock-onboard" style="height:100%;background:var(--surface);justify-content:flex-start;padding-top:16px;">
+          <div style="width:100%;display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <div style="height:12px;width:100px;background:rgba(255,255,255,0.1);border-radius:4px;"></div>
+          </div>
+          <div style="width:100%;background:var(--card);border-radius:10px;padding:10px;">
+            <div style="height:32px;background:var(--card2);border-radius:8px;display:flex;align-items:center;padding:0 10px;">
+              <div style="font-family:'Syne',sans-serif;color:var(--green);font-size:0.85rem;font-weight:800;">₹ 2,500</div>
+            </div>
+            <div style="margin:8px 0;display:flex;gap:6px;">
+              <div style="flex:1;height:22px;background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.4);border-radius:6px;"></div>
+              <div style="flex:1;height:22px;background:var(--card2);border-radius:6px;"></div>
+              <div style="flex:1;height:22px;background:var(--card2);border-radius:6px;"></div>
+            </div>
+          </div>
+          <div style="width:100%;background:var(--card);border-radius:10px;padding:10px;display:flex;justify-content:space-between;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="height:6px;width:60px;background:rgba(255,255,255,0.07);border-radius:3px;"></div>
+              <div style="height:10px;width:50px;background:rgba(0,208,156,0.4);border-radius:3px;"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="height:6px;width:60px;background:rgba(255,255,255,0.07);border-radius:3px;"></div>
+              <div style="height:10px;width:50px;background:rgba(201,168,76,0.4);border-radius:3px;"></div>
+            </div>
+          </div>
+          <div class="mock-btn-gold" style="width:100%;border-radius:8px;"></div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Loan Request Builder</div>
+        <div class="screen-desc">Slider for amount. Tenure selector (7/14/30 days). Live breakdown card: principal + interest + fee = total repay. Purpose tags. One-tap submit.</div>
+        <div class="screen-chips"><span class="chip">Amount Slider</span><span class="chip">Tenure Picker</span><span class="chip">Live Calc</span><span class="chip">Purpose Tags</span></div>
+      </div>
+    </div>
+
+    <!-- Credit Score -->
+    <div class="screen-card">
+      <div class="screen-tag tag-borrower">BORROWER</div>
+      <div class="screen-mockup">
+        <div class="mock-credit" style="height:100%">
+          <div class="mock-score-ring">
+            <div class="mock-score-inner">742</div>
+          </div>
+          <div style="height:8px;width:80px;background:rgba(0,208,156,0.3);border-radius:4px;"></div>
+          <div class="mock-score-label"></div>
+          <div class="mock-factors">
+            <div class="mock-factor-row"><div class="mock-factor-label"></div><div class="mock-factor-bar"><div class="mock-factor-fill" style="width:85%;background:var(--green)"></div></div></div>
+            <div class="mock-factor-row"><div class="mock-factor-label"></div><div class="mock-factor-bar"><div class="mock-factor-fill" style="width:60%;background:var(--gold)"></div></div></div>
+            <div class="mock-factor-row"><div class="mock-factor-label"></div><div class="mock-factor-bar"><div class="mock-factor-fill" style="width:95%;background:var(--blue)"></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Credit Score Screen</div>
+        <div class="screen-desc">Animated ring chart showing score 300–900. Factor breakdown: repayment history, loan count, account age. Borrowing limit unlocked vs. total.</div>
+        <div class="screen-chips"><span class="chip">Score Ring</span><span class="chip">Factor Bars</span><span class="chip">Borrow Limit</span><span class="chip">Tips</span></div>
+      </div>
+    </div>
+
+    <!-- Provider Marketplace -->
+    <div class="screen-card">
+      <div class="screen-tag tag-provider">PROVIDER</div>
+      <div class="screen-mockup">
+        <div class="mock-market" style="height:100%">
+          <div class="mock-market-header">
+            <div class="mock-market-title"></div>
+            <div style="display:flex;gap:4px;">
+              <div style="width:20px;height:14px;background:var(--card2);border-radius:4px;"></div>
+              <div style="width:20px;height:14px;background:var(--card2);border-radius:4px;"></div>
+            </div>
+          </div>
+          <div class="mock-filter-row">
+            <div class="mock-filter-chip" style="background:var(--green-dim);border:1px solid rgba(0,208,156,0.3);color:var(--green)">All</div>
+            <div class="mock-filter-chip" style="background:var(--card2);color:var(--muted)">7d</div>
+            <div class="mock-filter-chip" style="background:var(--card2);color:var(--muted)">14d</div>
+            <div class="mock-filter-chip" style="background:var(--card2);color:var(--muted)">30d</div>
+          </div>
+          <div class="mock-loan-card">
+            <div class="mock-loan-row1"><div class="mock-borrower-id"></div><div class="mock-loan-amt"></div></div>
+            <div class="mock-loan-meta"><div class="mock-meta-pill"></div><div class="mock-meta-pill"></div><div class="mock-meta-pill"></div></div>
+            <div class="mock-loan-footer"><div class="mock-return"></div><div class="mock-fund-btn"></div></div>
+          </div>
+          <div class="mock-loan-card" style="opacity:0.5">
+            <div class="mock-loan-row1"><div class="mock-borrower-id"></div><div class="mock-loan-amt" style="background:rgba(201,168,76,0.4)"></div></div>
+            <div class="mock-loan-meta"><div class="mock-meta-pill"></div><div class="mock-meta-pill"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Loan Marketplace</div>
+        <div class="screen-desc">Anonymous loan cards showing: amount, tenure, credit score badge, expected return %. Sort/filter by tenure, return rate, credit score. Animated "Fund Now" CTA.</div>
+        <div class="screen-chips"><span class="chip">Filter Pills</span><span class="chip">Loan Cards</span><span class="chip">Anon IDs</span><span class="chip">Return Rate</span></div>
+      </div>
+    </div>
+
+    <!-- Provider Dashboard -->
+    <div class="screen-card">
+      <div class="screen-tag tag-provider">PROVIDER</div>
+      <div class="screen-mockup">
+        <div class="mock-dashboard" style="height:100%">
+          <div class="mock-sidebar">
+            <div class="mock-sidebar-icon active" style="background:var(--green-dim);border:1px solid rgba(0,208,156,0.3)">🏠</div>
+            <div class="mock-sidebar-icon">🏦</div>
+            <div class="mock-sidebar-icon">📊</div>
+            <div class="mock-sidebar-icon">💰</div>
+          </div>
+          <div class="mock-main">
+            <div class="mock-top-row">
+              <div class="mock-big-card">
+                <div class="mock-amount-big"></div>
+                <div class="mock-label-sm"></div>
+                <div class="mock-progress-bar" style="margin-top:8px"><div class="mock-progress-fill" style="background:linear-gradient(90deg,var(--green),rgba(0,208,156,0.2));width:72%"></div></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div class="mock-small-card"><div class="mock-stat-num" style="background:rgba(0,208,156,0.4)"></div><div class="mock-label-sm"></div></div>
+                <div class="mock-small-card"><div class="mock-stat-num" style="background:rgba(201,168,76,0.4)"></div><div class="mock-label-sm"></div></div>
+              </div>
+            </div>
+            <div class="mock-list">
+              <div class="mock-list-row"><div class="mock-list-dot" style="background:var(--green)"></div><div class="mock-list-line"></div><div class="mock-list-amt" style="background:rgba(0,208,156,0.4)"></div></div>
+              <div class="mock-list-row"><div class="mock-list-dot" style="background:var(--blue)"></div><div class="mock-list-line"></div><div class="mock-list-amt" style="background:rgba(76,142,255,0.4)"></div></div>
+              <div class="mock-list-row"><div class="mock-list-dot" style="background:var(--gold)"></div><div class="mock-list-line"></div><div class="mock-list-amt" style="background:rgba(201,168,76,0.4)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Provider Dashboard</div>
+        <div class="screen-desc">Total lent, total earned, portfolio return %. Active loans with repayment countdown rings. Earnings chart. Withdraw CTA. Provider rating badge.</div>
+        <div class="screen-chips"><span class="chip">Earnings</span><span class="chip">Active Loans</span><span class="chip">Portfolio</span><span class="chip">Withdraw</span></div>
+      </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div class="screen-card">
+      <div class="screen-tag tag-admin">ADMIN</div>
+      <div class="screen-mockup">
+        <div class="mock-admin" style="height:100%">
+          <div class="mock-admin-sidebar">
+            <div style="width:24px;height:24px;background:rgba(76,142,255,0.2);border-radius:6px;margin-bottom:4px;"></div>
+            <div class="mock-admin-icon act">📊</div>
+            <div class="mock-admin-icon">👥</div>
+            <div class="mock-admin-icon">💳</div>
+            <div class="mock-admin-icon">🔍</div>
+            <div class="mock-admin-icon">⚙️</div>
+          </div>
+          <div class="mock-admin-main">
+            <div class="mock-stat-row">
+              <div class="mock-stat-box"><div style="height:8px;width:40px;background:rgba(76,142,255,0.4);border-radius:3px;margin-bottom:4px;"></div><div style="height:6px;width:60px;background:rgba(255,255,255,0.05);border-radius:3px;"></div></div>
+              <div class="mock-stat-box"><div style="height:8px;width:40px;background:rgba(0,208,156,0.4);border-radius:3px;margin-bottom:4px;"></div><div style="height:6px;width:60px;background:rgba(255,255,255,0.05);border-radius:3px;"></div></div>
+              <div class="mock-stat-box"><div style="height:8px;width:40px;background:rgba(201,168,76,0.4);border-radius:3px;margin-bottom:4px;"></div><div style="height:6px;width:60px;background:rgba(255,255,255,0.05);border-radius:3px;"></div></div>
+            </div>
+            <div class="mock-table">
+              <div class="mock-thead"><div class="mock-th"></div><div class="mock-th"></div><div class="mock-th"></div><div class="mock-th"></div></div>
+              <div class="mock-tr"><div class="mock-td" style="background:rgba(0,208,156,0.2)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div><div class="mock-td" style="background:rgba(76,142,255,0.2)"></div></div>
+              <div class="mock-tr"><div class="mock-td" style="background:rgba(201,168,76,0.2)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div></div>
+              <div class="mock-tr"><div class="mock-td" style="background:rgba(255,92,92,0.2)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div><div class="mock-td" style="background:rgba(255,255,255,0.06)"></div><div class="mock-td" style="background:rgba(255,92,92,0.2)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Admin Dashboard</div>
+        <div class="screen-desc">Platform revenue, user counts, loan volumes at a glance. Real-time transaction table. KYC queue. Flagged account alerts. Blue-accent authority aesthetic.</div>
+        <div class="screen-chips"><span class="chip">Platform Stats</span><span class="chip">User Table</span><span class="chip">KYC Queue</span><span class="chip">Alerts</span></div>
+      </div>
+    </div>
+
+    <!-- Transaction / Repay Screen -->
+    <div class="screen-card">
+      <div class="screen-tag tag-shared">SHARED</div>
+      <div class="screen-mockup" style="background:var(--surface);display:flex;align-items:center;justify-content:center;">
+        <div style="padding:20px;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;">
+          <div style="width:64px;height:64px;border-radius:50%;background:var(--green-dim);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:1.6rem;">💸</div>
+          <div style="height:22px;width:120px;background:linear-gradient(90deg,var(--green),rgba(0,208,156,0.3));border-radius:6px;"></div>
+          <div style="height:8px;width:80px;background:rgba(255,255,255,0.08);border-radius:4px;"></div>
+          <div style="width:100%;background:var(--card);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;justify-content:space-between;"><div style="height:7px;width:60px;background:rgba(255,255,255,0.07);border-radius:3px;"></div><div style="height:7px;width:50px;background:rgba(0,208,156,0.3);border-radius:3px;"></div></div>
+            <div style="display:flex;justify-content:space-between;"><div style="height:7px;width:70px;background:rgba(255,255,255,0.07);border-radius:3px;"></div><div style="height:7px;width:40px;background:rgba(201,168,76,0.3);border-radius:3px;"></div></div>
+            <div style="height:1px;background:var(--border);"></div>
+            <div style="display:flex;justify-content:space-between;"><div style="height:10px;width:60px;background:rgba(255,255,255,0.1);border-radius:3px;"></div><div style="height:10px;width:60px;background:rgba(0,208,156,0.5);border-radius:3px;"></div></div>
+          </div>
+          <div style="width:100%;height:28px;background:var(--green);border-radius:24px;"></div>
+        </div>
+      </div>
+      <div class="screen-info">
+        <div class="screen-name">Payment / Repay Screen</div>
+        <div class="screen-desc">Amount breakdown card (principal + interest + fee). UPI QR or deep-link launch. Real-time Razorpay status. Success/failure animated state screen.</div>
+        <div class="screen-chips"><span class="chip">Breakdown</span><span class="chip">UPI Flow</span><span class="chip">Success State</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 4. COMPONENTS -->
+<div class="section reveal" id="components">
+  <div class="section-header">
+    <div class="section-num">04</div>
+    <div>
+      <div class="section-title">Component Library</div>
+      <div class="section-sub">Core UI building blocks — consistent, reusable, CRED-inspired</div>
+    </div>
+  </div>
+  <div class="comp-grid">
+    <!-- Buttons -->
+    <div class="comp-card">
+      <div class="comp-label">Buttons</div>
+      <div class="btn-row">
+        <button class="btn-primary">Borrow Now</button>
+        <button class="btn-secondary">View Details</button>
+      </div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn-success">Fund Loan</button>
+        <button class="btn-danger">Report</button>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="comp-card">
+      <div class="comp-label">Status Badges</div>
+      <div class="badge-row">
+        <span class="badge badge-active">● Active</span>
+        <span class="badge badge-pending">● Pending</span>
+        <span class="badge badge-repaid">● Repaid</span>
+        <span class="badge badge-default">● Default</span>
+        <span class="badge badge-review">● In Review</span>
+      </div>
+    </div>
+
+    <!-- Stat Card -->
+    <div class="comp-card">
+      <div class="comp-label">Stat Card</div>
+      <div class="stat-comp">
+        <div class="stat-top">
+          <div class="stat-icon" style="background:var(--green-dim)">💰</div>
+          <span class="stat-change up">↑ 12.4%</span>
+        </div>
+        <div class="stat-num" style="color:var(--green)">₹48,250</div>
+        <div class="stat-lbl">Total Disbursed This Month</div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="comp-card">
+      <div class="comp-label">Form Inputs</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label class="input-label">Loan Amount</label>
+          <input type="text" class="input-demo" placeholder="Enter amount (₹500 – ₹10,000)">
+        </div>
+        <div>
+          <label class="input-label">UPI ID</label>
+          <input type="text" class="input-demo" placeholder="yourname@upi">
+        </div>
+      </div>
+    </div>
+
+    <!-- Loan Card -->
+    <div class="comp-card" style="grid-column: span 2;">
+      <div class="comp-label">Active Loan Card</div>
+      <div class="loan-card-demo">
+        <div class="loan-header">
+          <div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-bottom:4px;">Active Loan · UniFi#2847</div>
+            <div class="loan-amount">₹3,500.00</div>
+          </div>
+          <span class="badge badge-active">● Active</span>
+        </div>
+        <div class="loan-meta-row">
+          <span class="loan-meta-item">📅 30 days</span>
+          <span class="loan-meta-item">📚 Books</span>
+          <span class="loan-meta-item">🎓 VIT Chennai</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--muted);margin-bottom:4px;">
+          <span>Repayment progress</span>
+          <span style="color:var(--green)">Day 19 of 30</span>
+        </div>
+        <div class="loan-progress"><div class="loan-progress-fill"></div></div>
+        <div class="loan-footer-row">
+          <div class="loan-due">Due: <span>₹3,675 by Mar 15</span></div>
+          <button class="btn-primary" style="font-size:0.75rem;padding:7px 18px;">Repay Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Icons -->
+    <div class="comp-card" style="grid-column: span 2;">
+      <div class="comp-label">Icon Language</div>
+      <div class="icon-grid">
+        <div class="icon-item"><span class="icon-emoji">💸</span><span class="icon-name">Borrow</span></div>
+        <div class="icon-item"><span class="icon-emoji">📈</span><span class="icon-name">Provide</span></div>
+        <div class="icon-item"><span class="icon-emoji">🎓</span><span class="icon-name">University</span></div>
+        <div class="icon-item"><span class="icon-emoji">🔐</span><span class="icon-name">Security</span></div>
+        <div class="icon-item"><span class="icon-emoji">📊</span><span class="icon-name">Analytics</span></div>
+        <div class="icon-item"><span class="icon-emoji">⚡</span><span class="icon-name">Fast</span></div>
+        <div class="icon-item"><span class="icon-emoji">🛡️</span><span class="icon-name">KYC</span></div>
+        <div class="icon-item"><span class="icon-emoji">💳</span><span class="icon-name">UPI Pay</span></div>
+        <div class="icon-item"><span class="icon-emoji">⏱️</span><span class="icon-name">Countdown</span></div>
+        <div class="icon-item"><span class="icon-emoji">🌐</span><span class="icon-name">Campus</span></div>
+        <div class="icon-item"><span class="icon-emoji">🔔</span><span class="icon-name">Alerts</span></div>
+        <div class="icon-item"><span class="icon-emoji">📋</span><span class="icon-name">Ledger</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. VISUALS & IMAGERY -->
+<div class="section reveal" id="visuals">
+  <div class="section-header">
+    <div class="section-num">05</div>
+    <div>
+      <div class="section-title">Visual Language — Images, Textures & Effects</div>
+      <div class="section-sub">No stock photos. Abstract, geometric, trust-building visual system.</div>
+    </div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:32px;">
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:8px;">🚫 What We DON'T Use</div>
+    <div style="color:var(--muted);font-size:0.85rem;line-height:1.8;">Generic handshake photos · Smiling stock students · Money/cash imagery (feels predatory) · Bright white backgrounds · Generic bank-style illustrations · Purple gradient "fintech" aesthetics</div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid rgba(0,208,156,0.2);border-radius:20px;padding:28px;margin-bottom:32px;">
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:8px;color:var(--green)">✅ What We DO Use</div>
+    <div style="color:var(--muted);font-size:0.85rem;line-height:1.8;">Abstract geometric mesh backgrounds · Dark glassmorphism cards · Gradient glows (radial, not linear) · Data viz as decoration · Animated SVG icons · Lottie micro-animations for success/loading · University campus skyline silhouettes as subtle texture</div>
+  </div>
+
+  <div class="visual-grid">
+    <div class="visual-card">
+      <div class="visual-preview grad-1">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;">
+          <div style="width:60px;height:60px;border-radius:50%;border:1px solid rgba(201,168,76,0.4);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🎓</div>
+          <div style="width:80px;height:1px;background:rgba(201,168,76,0.3);"></div>
+          <div style="width:40px;height:1px;background:rgba(201,168,76,0.2);"></div>
+        </div>
+      </div>
+      <div class="visual-info">
+        <div class="visual-name">Hero Background</div>
+        <div class="visual-desc">Radial gold-green mesh gradient. Landing page hero. Suggests warmth + growth without showing cash.</div>
+      </div>
+    </div>
+    <div class="visual-card">
+      <div class="visual-preview grad-2">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div style="width:80px;height:80px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:20px;backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;font-size:2rem;">💳</div>
+        </div>
+      </div>
+      <div class="visual-info">
+        <div class="visual-name">Glassmorphism Cards</div>
+        <div class="visual-desc">Frosted glass effect for loan cards and modal overlays. Depth without weight.</div>
+      </div>
+    </div>
+    <div class="visual-card">
+      <div class="visual-preview grad-3">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(0,208,156,0.2)" stroke-width="1"/>
+            <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(0,208,156,0.15)" stroke-width="1"/>
+            <circle cx="50" cy="50" r="20" fill="none" stroke="rgba(0,208,156,0.3)" stroke-width="1.5"/>
+            <circle cx="50" cy="50" r="8" fill="rgba(0,208,156,0.6)"/>
+            <line x1="50" y1="10" x2="50" y2="90" stroke="rgba(0,208,156,0.1)" stroke-width="0.5"/>
+            <line x1="10" y1="50" x2="90" y2="50" stroke="rgba(0,208,156,0.1)" stroke-width="0.5"/>
+          </svg>
+        </div>
+      </div>
+      <div class="visual-info">
+        <div class="visual-name">Radar / Network Art</div>
+        <div class="visual-desc">Abstract "campus network" — concentric rings suggesting connection and range. Used as background texture on provider screens.</div>
+      </div>
+    </div>
+    <div class="visual-card">
+      <div class="visual-preview" style="background:var(--card)">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div style="font-size:0.6rem;font-family:'DM Mono',monospace;color:rgba(0,208,156,0.6)">PROCESSING</div>
+          <div style="width:40px;height:40px;border-radius:50%;border:2px solid rgba(201,168,76,0.2);border-top-color:var(--gold);animation:spin 1s linear infinite;"></div>
+          <div style="font-size:0.5rem;color:var(--muted)">Verifying UPI...</div>
+        </div>
+      </div>
+      <div class="visual-info">
+        <div class="visual-name">Loading / States</div>
+        <div class="visual-desc">Skeleton loaders, spinner rings in brand colours, Lottie checkmark on success, shake animation on error.</div>
+      </div>
+    </div>
+    <div class="visual-card">
+      <div class="visual-preview grad-4">
+        <div style="position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;">
+          <svg width="180" height="60" viewBox="0 0 180 60">
+            <polyline points="0,50 30,35 60,40 90,20 120,25 150,10 180,5" fill="none" stroke="rgba(201,168,76,0.6)" stroke-width="2"/>
+            <polyline points="0,50 30,35 60,40 90,20 120,25 150,10 180,5 180,60 0,60" fill="rgba(201,168,76,0.05)"/>
+          </svg>
+        </div>
+      </div>
+      <div class="visual-info">
+        <div class="visual-name">Earnings Charts</div>
+        <div class="visual-desc">Line charts with gold gradient fill for provider earnings. Green for repayment progress. Minimalist axes, no gridlines.</div>
+      </div>
+    </div>
+    <div class="visual-card">
+      <div class="visual-preview" style="background:var(--surface)">
+        <div style="display:flex;gap:8px;align-items:flex-end;padding:20px;">
+          <div style="width:20px;height:30px;background:rgba(201,168,76,0.3);border-radius:4px 4px 0 0;"></div>
+          <div style="width:20px;height:50px;background:rgba(201,168,76,0.5);border-radius:4px 4px 0 0;"></div>
+          <div style="width:20px;height:40px;background:rgba(201,168,76,0.3);border-radius:4px 4px 0 0;"></div>
+          <div style="width:20px;height:60px;background:var(--gold);border-radius:4px 4px 0 0;"></div>
+          <div style="width:20px;height:45px;background:rgba(201,168,76,0.3);border-radius:4px 4px 0 0;"></div>
+          <div style="width:20px;height:35px;background:rgba(201,168,76,0.3);border-radius:4px 4px 0 0;"></div>
+        </div>
+      </div>
+      <div class="visual-info">
+        <div class="visual-name">Admin Bar Charts</div>
+        <div class="visual-desc">Vertical bars for loan volume by month. Tallest bar highlighted in solid gold. No chart borders.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Motion -->
+  <div style="margin-top:40px;">
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:20px;">Motion & Animations</div>
+    <div class="motion-grid">
+      <div class="motion-card">
+        <div class="motion-icon">✨</div>
+        <div class="motion-name">Page Load</div>
+        <div class="motion-desc">Staggered fade-up for cards (100ms delay each). Logo animates in from center. Hero text typewriter effect.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-icon">🔢</div>
+        <div class="motion-name">Number Count-Up</div>
+        <div class="motion-desc">All financial amounts animate from 0 to final value on page load. Eased deceleration curve.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-icon">⭕</div>
+        <div class="motion-name">Score Ring</div>
+        <div class="motion-desc">Credit score ring draws itself over 1.2s. Smooth CSS conic-gradient animation.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-icon">✅</div>
+        <div class="motion-name">Success State</div>
+        <div class="motion-desc">Lottie checkmark animation after payment. Green ripple pulse. Confetti burst (subtle, 1 second).</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-icon">🃏</div>
+        <div class="motion-name">Card Hover</div>
+        <div class="motion-desc">translateY(-4px) + gold border + glow shadow on loan and stat cards.</div>
+      </div>
+      <div class="motion-card">
+        <div class="motion-icon">🔔</div>
+        <div class="motion-name">Notification Bell</div>
+        <div class="motion-desc">Gentle swing animation when new notification arrives. Red dot pops in with scale bounce.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. LAYOUT -->
+<div class="section reveal" id="layout">
+  <div class="section-header">
+    <div class="section-num">06</div>
+    <div>
+      <div class="section-title">Layout System</div>
+      <div class="section-sub">CRED-style single-page feel with section-based navigation</div>
+    </div>
+  </div>
+
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:32px;">
+    <div style="font-family:'Syne',sans-serif;font-weight:700;margin-bottom:16px;">The CRED Layout Philosophy</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+      <div style="background:var(--card2);border-radius:12px;padding:16px;">
+        <div style="font-size:1.2rem;margin-bottom:8px;">🖤</div>
+        <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">Dark is Default</div>
+        <div style="font-size:0.75rem;color:var(--muted)">No light mode. The darkness creates premium, focused experience.</div>
+      </div>
+      <div style="background:var(--card2);border-radius:12px;padding:16px;">
+        <div style="font-size:1.2rem;margin-bottom:8px;">📱</div>
+        <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">Mobile First</div>
+        <div style="font-size:0.75rem;color:var(--muted)">Bottom nav bar on mobile. Bottom sheets for modals. Full-screen payment screens.</div>
+      </div>
+      <div style="background:var(--card2);border-radius:12px;padding:16px;">
+        <div style="font-size:1.2rem;margin-bottom:8px;">🔲</div>
+        <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">Card-Based</div>
+        <div style="font-size:0.75rem;color:var(--muted)">Everything lives in cards. No exposed rows or tables in consumer view.</div>
+      </div>
+      <div style="background:var(--card2);border-radius:12px;padding:16px;">
+        <div style="font-size:1.2rem;margin-bottom:8px;">🎯</div>
+        <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">One Action Per Screen</div>
+        <div style="font-size:0.75rem;color:var(--muted)">Each screen has ONE primary CTA. Borrower sees "Borrow." Provider sees "Fund." Admin sees "Review."</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout-grid">
+    <div class="layout-card">
+      <div class="layout-preview">
+        <div class="lay-sidebar-preview">
+          <div class="lay-sb"></div>
+          <div class="lay-content">
+            <div class="lay-top-nav"></div>
+            <div class="lay-body">
+              <div class="lay-main-area"></div>
+              <div class="lay-right-panel"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="layout-info">
+        <div class="layout-name">Dashboard Layout — Desktop</div>
+        <div class="layout-desc">Collapsed icon sidebar (48px) + main content area + right panel for quick actions. Used for all portal dashboards on desktop.</div>
+      </div>
+    </div>
+    <div class="layout-card">
+      <div class="layout-preview">
+        <div style="display:flex;flex-direction:column;width:100%;height:100%;background:var(--surface);">
+          <div style="flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="height:16px;background:rgba(255,255,255,0.04);border-radius:4px;width:60%;"></div>
+            <div style="flex:1;background:rgba(255,255,255,0.02);border-radius:8px;"></div>
+            <div style="height:50px;background:rgba(255,255,255,0.02);border-radius:8px;"></div>
+          </div>
+          <div style="height:56px;background:var(--card);border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:center;padding:0 20px;">
+            <div style="width:24px;height:24px;border-radius:6px;background:var(--gold-dim);border:1px solid rgba(201,168,76,0.4);"></div>
+            <div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.03);"></div>
+            <div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.03);"></div>
+            <div style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,0.03);"></div>
+          </div>
+        </div>
+      </div>
+      <div class="layout-info">
+        <div class="layout-name">Mobile Layout</div>
+        <div class="layout-desc">Bottom navigation bar with 4 tabs. Full-bleed content area. Floating action button for primary CTA. No sidebar.</div>
+      </div>
+    </div>
+    <div class="layout-card">
+      <div class="layout-preview">
+        <div class="lay-split-preview">
+          <div class="lay-half-1">
+            <div style="text-align:center;font-family:'Syne',sans-serif;font-size:0.6rem;color:var(--gold);font-weight:700;line-height:1.4;">UniFi<br><span style="font-size:1.5rem;display:block;margin-top:4px;">💸</span></div>
+          </div>
+          <div class="lay-half-2">
+            <div style="padding:12px;width:100%;display:flex;flex-direction:column;gap:8px;">
+              <div style="height:10px;width:80%;background:rgba(255,255,255,0.1);border-radius:4px;"></div>
+              <div style="height:24px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:6px;"></div>
+              <div style="height:24px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:6px;"></div>
+              <div style="height:24px;background:var(--gold);border-radius:6px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="layout-info">
+        <div class="layout-name">Auth / Onboarding — Split Screen</div>
+        <div class="layout-desc">Left: brand visual / illustration. Right: form content. On mobile collapses to full-screen form with top logo.</div>
+      </div>
+    </div>
+    <div class="layout-card">
+      <div class="layout-preview">
+        <div class="lay-fullscreen-preview">CONFIRM PAYMENT</div>
+      </div>
+      <div class="layout-info">
+        <div class="layout-name">Full-Screen Action Screen</div>
+        <div class="layout-desc">Payment confirmation, success/error states, and KYC submission use full-screen focused layouts — no navigation, just the action.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. USER JOURNEY -->
+<div class="section reveal" id="journey">
+  <div class="section-header">
+    <div class="section-num">07</div>
+    <div>
+      <div class="section-title">User Journey Flows</div>
+      <div class="section-sub">Screen-by-screen navigation paths for each portal</div>
+    </div>
+  </div>
+
+  <div class="journey-tabs">
+    <button class="j-tab active-borrower" onclick="showJourney('borrower', this)">💳 Borrower</button>
+    <button class="j-tab" onclick="showJourney('provider', this)">📈 Provider</button>
+    <button class="j-tab" onclick="showJourney('admin', this)">🛡️ Admin</button>
+  </div>
+
+  <div id="journey-borrower" class="portal-wrapper active">
+    <div style="margin-bottom:16px;font-size:0.8rem;color:var(--muted);">Complete borrower journey from landing to loan repayment</div>
+    <div class="journey-flow">
+      <div class="j-step" style="border-color:rgba(201,168,76,0.3)">
+        <div class="j-step-num">STEP 1</div>
+        <div class="j-step-name" style="color:var(--gold)">Landing Page</div>
+        <div class="j-step-desc">Sees "Borrow within campus" hero. Clicks "Join as Borrower"</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 2</div>
+        <div class="j-step-name">Uni Email OTP</div>
+        <div class="j-step-desc">Enter university email. Receive 6-digit OTP. Verify.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 3</div>
+        <div class="j-step-name">KYC Upload</div>
+        <div class="j-step-desc">Student ID + selfie upload. Pending admin review.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 4</div>
+        <div class="j-step-name">UPI Link</div>
+        <div class="j-step-desc">Add and verify UPI ID for receiving disbursement.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 5</div>
+        <div class="j-step-name">Dashboard</div>
+        <div class="j-step-desc">Credit score, borrow limit, quick actions visible.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 6</div>
+        <div class="j-step-name">Request Loan</div>
+        <div class="j-step-desc">Slider → tenure → see breakdown → submit request.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step" style="border-color:rgba(0,208,156,0.3)">
+        <div class="j-step-num">STEP 7</div>
+        <div class="j-step-name" style="color:var(--green)">Loan Active</div>
+        <div class="j-step-desc">Provider funded → ₹ arrives in UPI. Countdown starts.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 8</div>
+        <div class="j-step-name">Repay Screen</div>
+        <div class="j-step-desc">Breakdown shown. UPI payment launched. Status updated.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="journey-provider" class="portal-wrapper">
+    <div style="margin-bottom:16px;font-size:0.8rem;color:var(--muted);">Provider journey from joining to earning returns</div>
+    <div class="journey-flow">
+      <div class="j-step" style="border-color:rgba(0,208,156,0.3)">
+        <div class="j-step-num">STEP 1</div>
+        <div class="j-step-name" style="color:var(--green)">Landing Page</div>
+        <div class="j-step-desc">Sees "Earn returns within your campus." Clicks "Become Provider"</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 2</div>
+        <div class="j-step-name">Email + KYC</div>
+        <div class="j-step-desc">Same onboarding: uni email OTP + student ID + UPI ID.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 3</div>
+        <div class="j-step-name">Dashboard</div>
+        <div class="j-step-desc">Total lent, earned, and "Browse Marketplace" CTA.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 4</div>
+        <div class="j-step-name">Marketplace</div>
+        <div class="j-step-desc">Browse anon loan cards. Filter by tenure/credit score/return %.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 5</div>
+        <div class="j-step-name">Fund Loan</div>
+        <div class="j-step-desc">Tap "Fund Now" → see breakdown → confirm → UPI payment to escrow.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 6</div>
+        <div class="j-step-name">Active Tracking</div>
+        <div class="j-step-desc">Loan appears in "My Active Loans" with repayment countdown.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step" style="border-color:rgba(0,208,156,0.3)">
+        <div class="j-step-num">STEP 7</div>
+        <div class="j-step-name" style="color:var(--green)">Repayment Received</div>
+        <div class="j-step-desc">Borrower repays → platform deducts fee → ₹ credited to provider wallet.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">STEP 8</div>
+        <div class="j-step-name">Withdraw</div>
+        <div class="j-step-desc">Transfer earnings to bank via UPI from wallet screen.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="journey-admin" class="portal-wrapper">
+    <div style="margin-bottom:16px;font-size:0.8rem;color:var(--muted);">Admin daily workflow — oversight and operations</div>
+    <div class="journey-flow">
+      <div class="j-step" style="border-color:rgba(76,142,255,0.3)">
+        <div class="j-step-num">TASK 1</div>
+        <div class="j-step-name" style="color:var(--blue)">Login</div>
+        <div class="j-step-desc">Secure login with MFA. Separate admin URL.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">TASK 2</div>
+        <div class="j-step-name">Overview Dash</div>
+        <div class="j-step-desc">Platform stats: revenue, active loans, new signups, alerts.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">TASK 3</div>
+        <div class="j-step-name">KYC Review Queue</div>
+        <div class="j-step-desc">Review pending KYC. Approve / reject with reason. User notified.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">TASK 4</div>
+        <div class="j-step-name">Loan Monitor</div>
+        <div class="j-step-desc">All active loans with status. Flag overdue. Initiate manual review.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">TASK 5</div>
+        <div class="j-step-name">User Lookup</div>
+        <div class="j-step-desc">Search any user. See full profile, loan history, KYC docs.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">TASK 6</div>
+        <div class="j-step-name">Fee Config</div>
+        <div class="j-step-desc">Adjust interest rates, platform fee %, loan limits. Changes take effect on next request.</div>
+      </div>
+      <div class="j-arrow">→</div>
+      <div class="j-step">
+        <div class="j-step-num">TASK 7</div>
+        <div class="j-step-name">Reports</div>
+        <div class="j-step-desc">Monthly revenue, default rates, cohort analysis. Export CSV.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary card -->
+  <div style="margin-top:40px;background:linear-gradient(135deg,rgba(201,168,76,0.06),rgba(0,208,156,0.04));border:1px solid rgba(201,168,76,0.2);border-radius:24px;padding:32px;">
+    <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;margin-bottom:8px;">The UniFi Design Principle</div>
+    <div style="color:var(--muted);font-size:0.9rem;line-height:1.8;max-width:600px;">
+      Every pixel earns trust. The dark luxury aesthetic signals that this is a serious financial platform — not a toy. Gold communicates aspiration and value. Green communicates growth and safety. Blue commands authority in the admin layer. Together, they create a platform students will <em style="color:var(--gold)">want</em> to use, not just <em>have</em> to use.
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script>
+// Nav scroll
+function scrollTo(id) {
+  document.querySelector(id).scrollIntoView({ behavior: 'smooth' });
+}
+
+// Journey tabs
+function showJourney(type, btn) {
+  document.querySelectorAll('.portal-wrapper').forEach(el => el.classList.remove('active'));
+  document.getElementById('journey-' + type).classList.add('active');
+  document.querySelectorAll('.j-tab').forEach(t => {
+    t.className = 'j-tab';
+  });
+  btn.classList.add('active-' + type);
+}
+
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.05 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Nav tab active on scroll
+const sections = ['colours','typography','screens','components','visuals','layout','journey'];
+const navTabs = document.querySelectorAll('.nav-tab');
+const scrollObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const idx = sections.indexOf(e.target.id);
+      if (idx >= 0) {
+        navTabs.forEach(t => t.classList.remove('active'));
+        if (navTabs[idx]) navTabs[idx].classList.add('active');
+      }
+    }
+  });
+}, { threshold: 0.4 });
+sections.forEach(id => { const el = document.getElementById(id); if(el) scrollObserver.observe(el); });
+</script>
+</body>
+</html>

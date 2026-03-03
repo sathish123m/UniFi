@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+**/.env
+**/.env.*
+*.log
+.DS_Store
+backend/node_modules/
+frontend/node_modules/
+backend/uploads/kyc/*
+backend/logs/*
+frontend/dist/
+frontend/public/media/user-pack/motion-neon-b.mp4
+frontend/public/media/user-pack/5909909-uhd_2160_4096_25fps.mp4
