@@ -1,18 +1,43 @@
-# UniFi - Campus Borrowing Platform
+# UniFi - Campus P2P Borrowing Platform
 
-A full-stack university lending platform with three portals:
-- Admin
-- Borrower
-- Provider
+![CI](https://github.com/sathish123m/UniFi/actions/workflows/ci.yml/badge.svg)
 
-## Project Paths
-- `/Users/msk/Desktop/Uni-Fi/backend` - Express + Prisma API
-- `/Users/msk/Desktop/Uni-Fi/frontend` - React + Vite app
-- `/Users/msk/Desktop/Uni-Fi/references/unifi-landing.html` - landing reference
-- `/Users/msk/Desktop/Uni-Fi/references/unifi-ui-blueprint.html` - UI blueprint reference
+UniFi is a full-stack lending platform for university students where:
+- Borrowers request short-term money from peers
+- Providers fund loans and earn returns
+- Admins manage KYC, risk, and platform controls
 
-## One-Command Local Usage
-From `/Users/msk/Desktop/Uni-Fi`:
+The system is built as a production-style SWE/SDE monorepo with role-based access, OTP verification, payment gateway integration (Razorpay test mode), and security controls.
+
+## Architecture
+- `frontend/`: React + Vite client
+- `backend/`: Node.js + Express API
+- `backend/prisma/`: Prisma schema + migrations/seeding
+- `scripts/`: local setup/dev/smoke helpers
+- `docs/`: deployment and operational guides
+
+High-level flow:
+1. User registers with allowed university email domain
+2. OTP verifies account ownership
+3. Borrower posts request, provider funds, platform tracks lifecycle
+4. Payment events are verified via API + webhook signatures
+5. Admin panel governs KYC, moderation, and config
+
+## Core Product Areas
+- `Admin`: KYC review, user moderation, platform configuration, operational control
+- `Borrower`: register/login, loan requests, repayment
+- `Provider`: marketplace funding, order creation, return tracking
+
+## Security Controls
+- JWT auth with role-based route protection
+- Helmet, HPP, CORS restrictions
+- Rate limiting (global/auth/OTP)
+- Encrypted sensitive fields (UPI)
+- Webhook signature verification for Razorpay
+- Input validation with Zod
+
+## Quick Start (Local)
+From repo root:
 
 ```bash
 npm run setup
@@ -20,120 +45,46 @@ npm run dev
 ```
 
 Useful commands:
+
 ```bash
-npm run db:studio   # open Prisma Studio on http://localhost:5555
-npm run smoke       # quick API health/login check
-npm run build:frontend
-npm --prefix backend run smtp:test -- you@example.com
-npm --prefix backend run payment:test -- 1
-```
-
-## Runtime URLs
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:5050`
-- Prisma Studio: `http://localhost:5555`
-
-## Auth + OTP (Dev Mode)
-- Register requires supported university domain email.
-- In development, register/resend OTP returns `devOtp` so you can verify immediately.
-- UI shows this as `Dev OTP` in verify tab.
-
-## Supported University Domains (Seeded)
-- `vitstudent.ac.in`
-- `bits-pilani.ac.in`
-- `srmist.edu.in`
-- `manipal.edu`
-- `psgtech.ac.in`
-- `am.students.amrita.edu`
-- `vit.ac.in`
-
-## Payment Modes
-### 1) MOCK (default, free)
-- `PAYMENT_PROVIDER=MOCK`
-- Full local e2e without external payment setup.
-
-### 2) Razorpay (live/prod)
-- `PAYMENT_PROVIDER=RAZORPAY`
-- Requires:
-  - `RAZORPAY_KEY_ID`
-  - `RAZORPAY_KEY_SECRET`
-  - `RAZORPAY_WEBHOOK_SECRET`
-  - optional: `RAZORPAY_VERIFY_API=true` (recommended)
-
-### Razorpay Setup Checklist
-1. Create test keys in Razorpay dashboard and set in `/Users/msk/Desktop/Uni-Fi/backend/.env`.
-2. Set:
-```env
-PAYMENT_PROVIDER=RAZORPAY
-RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxx
-RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxx
-RAZORPAY_WEBHOOK_SECRET=your_webhook_secret
-RAZORPAY_VERIFY_API=true
-```
-3. Start backend and frontend.
-4. Test keys by creating a test order:
-```bash
-npm --prefix backend run payment:test -- 1
-```
-5. Configure Razorpay webhook:
-  - URL: `https://your-domain/api/payments/webhook`
-  - Events: `payment.captured`, `payment.failed`
-  - Secret must match `RAZORPAY_WEBHOOK_SECRET`.
-6. For local webhook testing, use tunneling (ngrok/cloudflared) and paste that HTTPS URL in Razorpay webhook settings.
-
-## Database Management
-### Visual UI
-```bash
+npm run check
+npm run smoke
 npm run db:studio
-```
-Open `http://localhost:5555` and edit records directly.
-
-### SQL CLI
-```bash
-psql "postgresql://msk@localhost:5432/unifi_db?host=/tmp"
+npm --prefix backend run smtp:test -- your-email@example.com
+npm --prefix backend run payment:test -- 1
 ```
 
-## SMTP Setup (Real OTP Emails)
-1. Get SMTP credentials from your provider dashboard (username, password/API key, host, port).
-2. Update `/Users/msk/Desktop/Uni-Fi/backend/.env`:
-```env
-SMTP_HOST="smtp-relay.brevo.com"
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_REQUIRE_TLS=true
-SMTP_ALLOW_SELF_SIGNED=false
-SMTP_USER="your_smtp_username"
-SMTP_PASS="your_smtp_password_or_key"
-SMTP_FROM="noreply@yourdomain.com"
-SMTP_TEST_TO="you@yourdomain.com"
-```
-3. Test credentials:
-```bash
-npm --prefix backend run smtp:test -- you@yourdomain.com
-```
-4. Restart backend:
-```bash
-cd /Users/msk/Desktop/Uni-Fi/backend
-npm run dev
-```
+## Environment Setup
+- Backend template: `backend/.env.example`
+- Frontend template: `frontend/.env.example`
 
-## Demo Accounts
-- Super Admin: `admin@unifi.campus / Admin@UniFi#2025`
-- Borrower: `borrower@vitstudent.ac.in / Demo@1234`
-- Provider: `provider@vitstudent.ac.in / Demo@1234`
+Required features for your project:
+- Real OTP emails via SMTP (`SMTP_*`)
+- Razorpay test mode (`PAYMENT_PROVIDER=RAZORPAY` with `rzp_test_*` keys)
+- Allowed university domains via `ALLOWED_UNIVERSITY_DOMAINS`
 
-Change admin credentials immediately after first login.
+## CI and Engineering Quality
+- GitHub Actions CI on every push/PR to `main`
+- Backend syntax validation
+- Prisma client generation check
+- Frontend production build check
+- Standardized issue templates and PR template
+- Contribution rules in `CONTRIBUTING.md`
 
-## What Is Already Done
-- Role-based auth and portal separation.
-- Loan request, funding, disbursal, repayment lifecycle.
-- KYC submission and admin review queue.
-- Platform config management and audit logs.
-- Landing page reworked to reference-style sections (`Problem`, `How`, `Portals`, `Trust`, `CTA`).
-- `Join Now` now scrolls to CTA role chooser; `I want to Borrow/Earn` opens role-prefilled register.
+## Deployment
+Full deployment runbook is available at:
+- `docs/DEPLOYMENT.md`
 
-## What Still Needs External Credentials
-- Production SMTP credentials for real OTP emails.
-- Razorpay live credentials + deployed webhook URL.
-- Cloud object storage (S3/R2) for production KYC document storage.
-- Deployment infra (domain + TLS + hosting).
+This includes:
+- Backend + frontend deployment shape
+- PostgreSQL/Redis requirements
+- SMTP verification
+- Razorpay test webhook setup
+- post-deploy smoke checklist
+
+## Demo Credentials (if dev seed is used)
+- Admin: `admin@unifi.campus / Admin@UniFi#2025`
+- Borrower: `borrower@lpu.in / Demo@1234`
+- Provider: `provider@lpu.in / Demo@1234`
+
+Do not use demo credentials in production.
