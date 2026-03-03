@@ -28,6 +28,10 @@ try {
 const app = express();
 
 app.disable("x-powered-by");
+if ((process.env.NODE_ENV || "development") === "production") {
+  // Required behind managed proxies/load balancers (Render, Fly, etc.)
+  app.set("trust proxy", 1);
+}
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },

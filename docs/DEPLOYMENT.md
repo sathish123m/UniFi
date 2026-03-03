@@ -1,102 +1,95 @@
-# UniFi Deployment Guide
+# UniFi Deployment (Render + Vercel, SMTP OTP + Razorpay Test)
 
-This guide is for deploying UniFi as a production-style SWE project while keeping:
-- Real email OTP delivery
-- Razorpay in test mode
+This runbook deploys your current project with:
+- Real email OTP (Gmail SMTP)
+- Razorpay in **Test Mode**
+- PostgreSQL + Redis
 
-## 1. Target Architecture
-- Frontend: Vite static app (Vercel/Netlify/Cloudflare Pages)
-- Backend: Node.js API (Render/Railway/Fly.io/EC2)
-- Database: PostgreSQL (managed)
-- Cache: Redis (managed)
-- SMTP: Gmail App Password (or any SMTP provider)
+## 1. Deploy Backend on Render
 
-## 2. Required Environment Variables
+1. Open [Render Dashboard](https://dashboard.render.com/).
+2. Click **New +** -> **Blueprint**.
+3. Select your GitHub repo: `sathish123m/UniFi`.
+4. Render will detect `/Users/msk/Desktop/Uni-Fi/render.yaml`.
+5. Create the backend service `unifi-backend`.
 
-### Backend
-Use `/Users/msk/Desktop/Uni-Fi/backend/.env.example` as baseline.
+After service creation, open backend service -> **Environment** and fill all `sync: false` variables.
 
-Mandatory:
-- `NODE_ENV=production`
-- `PORT`
-- `DATABASE_URL`
-- `REDIS_URL`
-- `JWT_ACCESS_SECRET` (>= 32 chars)
-- `JWT_REFRESH_SECRET` (>= 32 chars)
-- `ENCRYPTION_KEY` (64 hex chars)
-- `FRONTEND_URL`
-- `CORS_ORIGINS`
-
-OTP (SMTP):
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_SECURE`
-- `SMTP_USER`
-- `SMTP_PASS`
-- `SMTP_FROM`
-- `SMTP_STRICT=true`
-
-Payment (Razorpay test mode):
-- `PAYMENT_PROVIDER=RAZORPAY`
+Minimum required values:
+- `APP_URL=https://<your-render-service>.onrender.com`
+- `FRONTEND_URL=https://<your-vercel-domain>`
+- `CORS_ORIGINS=https://<your-vercel-domain>`
+- `DATABASE_URL=<your-neon-or-render-postgres-url>`
+- `REDIS_URL=<your-upstash-or-render-redis-url>`
+- `ENCRYPTION_KEY=<64-char-hex>`
 - `RAZORPAY_KEY_ID=rzp_test_...`
 - `RAZORPAY_KEY_SECRET=...`
 - `RAZORPAY_WEBHOOK_SECRET=...`
-- `RAZORPAY_VERIFY_API=true`
+- `SMTP_USER=<your-gmail-address>`
+- `SMTP_PASS=<gmail-16-char-app-password>`
+- `SMTP_FROM=<same-gmail-address>`
 
-University domain policy:
-- `ALLOWED_UNIVERSITY_DOMAINS=lpu.in,rguktn.ac.in`
+Notes:
+- `NODE_ENV=production`, `PAYMENT_PROVIDER=RAZORPAY`, and rate-limit defaults are already in `render.yaml`.
+- Startup command already runs `prisma migrate deploy`.
 
-### Frontend
-- `VITE_API_URL=https://<your-backend-domain>/api`
+## 2. Deploy Frontend on Vercel
 
-## 3. Database Migration and Seed
-Run once on deploy:
-```bash
-cd /Users/msk/Desktop/Uni-Fi/backend
-npx prisma generate
-npx prisma migrate deploy
-```
+1. Open [Vercel Dashboard](https://vercel.com/dashboard).
+2. Click **Add New...** -> **Project**.
+3. Import `sathish123m/UniFi`.
+4. Set **Root Directory** = `frontend`.
+5. Build settings:
+   - Build command: `npm run build`
+   - Output directory: `dist`
+6. Add environment variable:
+   - `VITE_API_URL=https://<your-render-service>.onrender.com/api`
+7. Deploy.
 
-Optional demo seed (do not run on production):
-```bash
-NODE_ENV=development node prisma/seed.js
-```
+`frontend/vercel.json` already includes SPA rewrite and cache headers.
 
-## 4. SMTP Verification
-```bash
-cd /Users/msk/Desktop/Uni-Fi/backend
-npm run smtp:test -- your-email@example.com
-```
+## 3. Wire CORS and App URLs Correctly
 
-Expected output:
-- `SMTP verify: OK`
-- `Message ID: ...`
+After Vercel gives a production URL:
+1. Update Render backend env:
+   - `FRONTEND_URL=https://<vercel-domain>`
+   - `CORS_ORIGINS=https://<vercel-domain>`
+2. Redeploy backend.
 
-## 5. Razorpay Test Webhook Setup
-In Razorpay Dashboard (Test Mode):
-1. Create webhook URL: `https://<backend-domain>/api/payments/webhook`
-2. Subscribe to:
+## 4. Configure Razorpay Test Webhook
+
+In [Razorpay Dashboard (Test)](https://dashboard.razorpay.com/):
+1. Go to **Webhooks** -> **Add New Webhook**.
+2. URL: `https://<your-render-service>.onrender.com/api/payments/webhook`
+3. Events:
    - `payment.captured`
    - `payment.failed`
-3. Use same secret in `RAZORPAY_WEBHOOK_SECRET`.
+4. Secret: exactly same value as `RAZORPAY_WEBHOOK_SECRET`.
 
-## 6. Post-Deploy Smoke Tests
-```bash
-cd /Users/msk/Desktop/Uni-Fi
-npm run smoke -- https://<backend-domain>
-```
+## 5. Verify SMTP OTP
 
-Manual checks:
-- Register -> OTP received -> verify success
-- Borrower login and borrower-only routes
-- Provider login and provider-only routes
-- Admin login and admin dashboard access
-- Funding and repayment order creation in Razorpay test mode
+From backend logs on Render:
+- Check no SMTP auth errors.
 
-## 7. Production Hardening Checklist
-- Enable HTTPS everywhere.
-- Restrict `CORS_ORIGINS` to exact production domains.
-- Rotate JWT/encryption/SMTP keys regularly.
-- Add centralized logging and alerts.
-- Enable daily database backups.
-- Add admin MFA.
+Functional test:
+1. Open frontend site.
+2. Register with allowed domain email (`@lpu.in` or second allowed domain).
+3. OTP email should arrive in inbox.
+4. Verify OTP and login.
+
+## 6. Post-Deploy Smoke Checklist
+
+- `GET /health` returns `status: ok`.
+- Borrower and provider login works.
+- Role guard works (cross-role route access blocked).
+- Create funding and repayment orders (Razorpay test).
+- OTP resend and verify flows are stable.
+
+## 7. Production Notes
+
+- Keep `.env` secrets only in provider dashboards; never in GitHub.
+- Rotate SMTP app password and Razorpay secrets periodically.
+- For custom domain, update:
+  - Vercel project domain
+  - Render env (`APP_URL`, `FRONTEND_URL`, `CORS_ORIGINS`)
+  - Razorpay webhook URL
