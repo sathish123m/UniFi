@@ -19,6 +19,20 @@ const normalizeRedisUrl = (raw) => {
     }
   }
 
+  // Upstash requires TLS in production environments.
+  if (/^redis:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value)
+      if ((parsed.hostname || '').toLowerCase().includes('upstash.io')) {
+        const upgraded = `rediss://${value.slice('redis://'.length)}`
+        logger.warn('REDIS_URL used redis:// with Upstash; upgraded to rediss:// automatically')
+        return upgraded
+      }
+    } catch (e) {
+      // ignore parse error and return original value
+    }
+  }
+
   return value
 }
 

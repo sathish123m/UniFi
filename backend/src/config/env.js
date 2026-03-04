@@ -54,6 +54,18 @@ const checkRedisConfig = () => {
   if (!looksLikeUri && !looksLikeCli) {
     err('REDIS_URL must start with redis:// or rediss:// (or be a redis-cli --tls -u ... command)')
   }
+
+  if (looksLikeUri) {
+    try {
+      const parsed = new URL(raw)
+      const host = (parsed.hostname || '').toLowerCase()
+      if (host.includes('upstash.io') && parsed.protocol === 'redis:') {
+        err('Upstash Redis requires TLS. Use rediss://... URL in REDIS_URL')
+      }
+    } catch (e) {
+      err('REDIS_URL is not a valid URI')
+    }
+  }
 }
 
 const validateEnv = () => {
