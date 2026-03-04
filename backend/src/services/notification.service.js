@@ -7,6 +7,9 @@ const smtpPort = Number(process.env.SMTP_PORT || '587')
 const smtpSecure = process.env.SMTP_SECURE
   ? String(process.env.SMTP_SECURE).toLowerCase() === 'true'
   : smtpPort === 465
+const smtpConnectionTimeoutMs = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || '12000')
+const smtpGreetingTimeoutMs = Number(process.env.SMTP_GREETING_TIMEOUT_MS || '10000')
+const smtpSocketTimeoutMs = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || '15000')
 const isProduction = (process.env.NODE_ENV || 'development') === 'production'
 const strictEmailDelivery =
   String(process.env.SMTP_STRICT || (isProduction ? 'true' : 'false')).toLowerCase() === 'true'
@@ -23,16 +26,63 @@ if (
   logger.warn('SMTP_FROM uses gmail.com with Mailjet. This can fail DMARC at recipient. Prefer custom domain or Gmail SMTP.')
 }
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-  port: smtpPort,
-  secure: smtpSecure,
-  requireTLS: String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true',
+const smtpHost = process.env.SMTP_HOST || 'smtp.mailtrap.io'
+
+const createTransporter = ({ host, port, secure, requireTLS }) => nodemailer.createTransport({
+  host,
+  port,
+  secure,
+  connectionTimeout: smtpConnectionTimeoutMs,
+  greetingTimeout: smtpGreetingTimeoutMs,
+  socketTimeout: smtpSocketTimeoutMs,
+  requireTLS,
   tls: {
     rejectUnauthorized: String(process.env.SMTP_ALLOW_SELF_SIGNED || 'false').toLowerCase() !== 'true',
   },
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
 })
+
+const primaryRequireTLS = String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true'
+const primaryTransporter = createTransporter({
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpSecure,
+  requireTLS: primaryRequireTLS,
+})
+
+const canUseGmailFallback = () =>
+  /smtp\.gmail\.com/i.test(String(smtpHost || '')) &&
+  smtpPort === 465 &&
+  smtpSecure
+
+const isNetworkTransportError = (error) => {
+  const text = String(error?.message || '').toLowerCase()
+  const code = String(error?.code || '').toUpperCase()
+  return (
+    text.includes('timeout') ||
+    text.includes('econnreset') ||
+    text.includes('epipe') ||
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNRESET' ||
+    code === 'EPIPE'
+  )
+}
+
+const sendMailWithFallback = async (mailOptions) => {
+  try {
+    return await primaryTransporter.sendMail(mailOptions)
+  } catch (error) {
+    if (!canUseGmailFallback() || !isNetworkTransportError(error)) throw error
+    logger.warn('Primary Gmail SMTP (465) failed; retrying with STARTTLS on port 587')
+    const fallbackTransporter = createTransporter({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+    })
+    return fallbackTransporter.sendMail(mailOptions)
+  }
+}
 
 const normalizePhone = (phone) => String(phone || '').trim().replace(/\s+/g, '')
 
@@ -45,7 +95,7 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
   const subject = subjects[purpose] || 'UniFi OTP'
   const text = `Your UniFi OTP is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`
   try {
-    const info = await transporter.sendMail({
+    const info = await sendMailWithFallback({
       from: smtpFrom,
       to: email,
       subject,

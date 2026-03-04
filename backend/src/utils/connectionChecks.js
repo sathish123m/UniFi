@@ -60,14 +60,17 @@ const checkSmtp = async () => {
   const smtpGreetingTimeoutMs = Number(process.env.SMTP_GREETING_TIMEOUT_MS || '10000')
   const smtpSocketTimeoutMs = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || '15000')
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: smtpPort,
-    secure: smtpSecure,
+  const smtpHost = process.env.SMTP_HOST
+  const smtpRequireTls = String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true'
+
+  const buildTransport = ({ host, port, secure, requireTLS }) => nodemailer.createTransport({
+    host,
+    port,
+    secure,
     connectionTimeout: smtpConnectionTimeoutMs,
     greetingTimeout: smtpGreetingTimeoutMs,
     socketTimeout: smtpSocketTimeoutMs,
-    requireTLS: String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true',
+    requireTLS,
     tls: {
       rejectUnauthorized: String(process.env.SMTP_ALLOW_SELF_SIGNED || 'false').toLowerCase() !== 'true',
     },
@@ -76,10 +79,36 @@ const checkSmtp = async () => {
 
   // SMTP is non-critical: try a couple of times but don't blow up the whole process if it fails
   try {
+    const transporter = buildTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      requireTLS: smtpRequireTls,
+    })
     await tryWithRetries(() => transporter.verify(), { retries: 2, delay: 1000, factor: 2, name: 'SMTP verify' })
     logger.info('✅ SMTP verified')
   } catch (e) {
-    logger.warn(`SMTP verification failed: ${e.message}`)
+    const canFallbackToGmailStarttls =
+      /smtp\.gmail\.com/i.test(String(smtpHost || '')) &&
+      smtpPort === 465 &&
+      smtpSecure
+    if (!canFallbackToGmailStarttls) {
+      logger.warn(`SMTP verification failed: ${e.message}`)
+      return
+    }
+    try {
+      logger.warn('SMTP verify failed on 465. Retrying Gmail STARTTLS on 587...')
+      const fallbackTransporter = buildTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+      })
+      await tryWithRetries(() => fallbackTransporter.verify(), { retries: 2, delay: 1000, factor: 2, name: 'SMTP verify fallback' })
+      logger.info('✅ SMTP verified (fallback 587)')
+    } catch (fallbackError) {
+      logger.warn(`SMTP verification failed: ${fallbackError.message}`)
+    }
   }
 }
 
