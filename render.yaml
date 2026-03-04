@@ -7,7 +7,7 @@ services:
     autoDeploy: true
     healthCheckPath: /health
     buildCommand: npm ci && npm run db:generate
-    startCommand: npx prisma migrate deploy && npm run start
+    startCommand: npm run db:prepare:prod && npm run start
     envVars:
       - key: NODE_VERSION
         value: 22
@@ -79,6 +79,8 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      - key: DB_SEED_ON_DEPLOY
+        value: true
 
       - key: SMS_PROVIDER
         value: MOCK
