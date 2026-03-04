@@ -65,6 +65,8 @@ services:
         value: false
       - key: SMTP_STRICT
         value: true
+      - key: SMTP_VERIFY_ON_STARTUP
+        value: false
       - key: SMTP_CONNECTION_TIMEOUT_MS
         value: 12000
       - key: SMTP_GREETING_TIMEOUT_MS

@@ -52,6 +52,12 @@ const checkRedis = async () => {
 }
 
 const checkSmtp = async () => {
+  const smtpVerifyOnStartup = String(process.env.SMTP_VERIFY_ON_STARTUP || 'false').toLowerCase() === 'true'
+  if (!smtpVerifyOnStartup) {
+    logger.info('SMTP verify skipped on startup (SMTP_VERIFY_ON_STARTUP=false)')
+    return
+  }
+
   const smtpPort = Number(process.env.SMTP_PORT || '587')
   const smtpSecure = process.env.SMTP_SECURE
     ? String(process.env.SMTP_SECURE).toLowerCase() === 'true'
