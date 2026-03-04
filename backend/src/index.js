@@ -78,6 +78,20 @@ app.get("/", (_, res) =>
   }),
 );
 
+app.get("/api", (_, res) =>
+  res.json({
+    success: true,
+    message: "UniFi API is running",
+    routes: [
+      "/api/auth",
+      "/api/users",
+      "/api/loans",
+      "/api/payments",
+      "/api/admin",
+    ],
+  }),
+);
+
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/loans", require("./routes/loan.routes"));
