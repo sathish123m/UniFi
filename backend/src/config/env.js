@@ -39,10 +39,28 @@ const checkPaymentSecrets = () => {
   }
 }
 
+const checkRedisConfig = () => {
+  const raw = String(process.env.REDIS_URL || '').trim()
+
+  if (isProduction && !raw) {
+    err('REDIS_URL is required in production')
+  }
+
+  if (!raw) return
+
+  const looksLikeUri = /^rediss?:\/\//i.test(raw)
+  const looksLikeCli = /^redis-cli\b/i.test(raw)
+
+  if (!looksLikeUri && !looksLikeCli) {
+    err('REDIS_URL must start with redis:// or rediss:// (or be a redis-cli --tls -u ... command)')
+  }
+}
+
 const validateEnv = () => {
   checkRequired()
   checkSecretStrength()
   checkPaymentSecrets()
+  checkRedisConfig()
 }
 
 const corsOrigins = () => {
