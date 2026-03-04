@@ -69,6 +69,15 @@ app.get("/health", (_, res) =>
   }),
 );
 
+app.get("/", (_, res) =>
+  res.json({
+    success: true,
+    message: "UniFi backend is running",
+    health: "/health",
+    apiBase: "/api",
+  }),
+);
+
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/loans", require("./routes/loan.routes"));

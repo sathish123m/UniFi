@@ -56,11 +56,17 @@ const checkSmtp = async () => {
   const smtpSecure = process.env.SMTP_SECURE
     ? String(process.env.SMTP_SECURE).toLowerCase() === 'true'
     : smtpPort === 465
+  const smtpConnectionTimeoutMs = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || '12000')
+  const smtpGreetingTimeoutMs = Number(process.env.SMTP_GREETING_TIMEOUT_MS || '10000')
+  const smtpSocketTimeoutMs = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || '15000')
 
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: smtpPort,
     secure: smtpSecure,
+    connectionTimeout: smtpConnectionTimeoutMs,
+    greetingTimeout: smtpGreetingTimeoutMs,
+    socketTimeout: smtpSocketTimeoutMs,
     requireTLS: String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true',
     tls: {
       rejectUnauthorized: String(process.env.SMTP_ALLOW_SELF_SIGNED || 'false').toLowerCase() !== 'true',
