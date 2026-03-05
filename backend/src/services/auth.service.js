@@ -27,6 +27,9 @@ const isDev = (process.env.NODE_ENV || "development") !== "production";
 const exposeDevOtp =
   isDev &&
   String(process.env.EXPOSE_DEV_OTP || "false").toLowerCase() === "true";
+const requireEmailVerification =
+  String(process.env.AUTH_REQUIRE_EMAIL_VERIFIED || "true").toLowerCase() !==
+  "false";
 const adminRoles = ["SUPER_ADMIN", "MOD_ADMIN", "FINANCE_ADMIN"];
 const portalRoleMap = {
   BORROWER: ["BORROWER"],
@@ -250,7 +253,7 @@ const login = async ({ email, password, requestedRole }) => {
     }
     if (!matched) throw err("Invalid credentials", 401);
 
-    if (!matched.emailVerified)
+    if (requireEmailVerification && !matched.emailVerified)
       throw err("Please verify your email first", 403);
     if (matched.isBanned) throw err("Account banned", 403);
     if (matched.isSuspended) throw err("Account suspended", 403);
@@ -286,7 +289,7 @@ const login = async ({ email, password, requestedRole }) => {
     throw err("Invalid credentials", 401);
   }
 
-  if (!matchCandidate.emailVerified)
+  if (requireEmailVerification && !matchCandidate.emailVerified)
     throw err("Please verify your email first", 403);
   if (matchCandidate.isBanned) throw err("Account banned", 403);
   if (matchCandidate.isSuspended) throw err("Account suspended", 403);

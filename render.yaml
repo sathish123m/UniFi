@@ -37,6 +37,8 @@ services:
 
       - key: EXPOSE_DEV_OTP
         value: false
+      - key: AUTH_REQUIRE_EMAIL_VERIFIED
+        value: true
       - key: ALLOWED_UNIVERSITY_DOMAINS
         value: lpu.in,rguktn.ac.in
       - key: ALLOWED_UNIVERSITY_DOMAIN
