@@ -92,9 +92,13 @@ async function main() {
   })
   console.log('   ✓ Super admin created → admin@unifi.campus\n')
 
-  // ── Demo Users (dev only) ─────────────────────────────
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('👥 Creating demo users (dev only)...')
+  // ── Demo Users (optional in production for test deployments) ──
+  const seedTestUsers =
+    process.env.NODE_ENV !== 'production' ||
+    String(process.env.SEED_TEST_USERS || 'false').toLowerCase() === 'true'
+
+  if (seedTestUsers) {
+    console.log('👥 Creating demo users...')
 
     const demoPass = await bcrypt.hash('Demo@1234', 12)
 

@@ -85,6 +85,8 @@ services:
         sync: false
       - key: DB_SEED_ON_DEPLOY
         value: true
+      - key: SEED_TEST_USERS
+        value: false
 
       - key: SMS_PROVIDER
         value: MOCK
