@@ -16,9 +16,16 @@ const strictEmailDelivery =
 const smtpFromAddress = process.env.SMTP_FROM || 'noreply@unifi.campus'
 const smtpFromName = String(process.env.SMTP_FROM_NAME || 'UniFi').trim() || 'UniFi'
 const smtpFrom = smtpFromAddress.includes('<') ? smtpFromAddress : `${smtpFromName} <${smtpFromAddress}>`
+const smtpFromEmail = (() => {
+  const raw = String(smtpFromAddress || '').trim()
+  const match = raw.match(/<([^>]+)>/)
+  return (match ? match[1] : raw) || 'noreply@unifi.campus'
+})()
 const smsProvider = String(process.env.SMS_PROVIDER || 'MOCK').trim().toUpperCase()
 const strictSmsDelivery = String(process.env.SMS_STRICT || 'false').toLowerCase() === 'true'
 const smsRealEnabled = smsProvider === 'TWILIO'
+const brevoApiKey = String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim()
+const brevoApiEnabled = Boolean(brevoApiKey)
 if (
   /mailjet/i.test(String(process.env.SMTP_HOST || '')) &&
   /@gmail\.com$/i.test(String(smtpFromAddress).trim())
@@ -43,44 +50,99 @@ const createTransporter = ({ host, port, secure, requireTLS }) => nodemailer.cre
 })
 
 const primaryRequireTLS = String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true'
-const primaryTransporter = createTransporter({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpSecure,
-  requireTLS: primaryRequireTLS,
-})
+const smtpCandidates = () => {
+  const unique = new Set()
+  const result = []
+  const push = (cfg) => {
+    const key = `${cfg.host}|${cfg.port}|${cfg.secure}|${cfg.requireTLS}`
+    if (unique.has(key)) return
+    unique.add(key)
+    result.push(cfg)
+  }
 
-const canUseGmailFallback = () =>
-  /smtp\.gmail\.com/i.test(String(smtpHost || '')) &&
-  smtpPort === 465 &&
-  smtpSecure
+  push({
+    name: 'primary',
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    requireTLS: primaryRequireTLS,
+  })
 
-const isNetworkTransportError = (error) => {
-  const text = String(error?.message || '').toLowerCase()
-  const code = String(error?.code || '').toUpperCase()
-  return (
-    text.includes('timeout') ||
-    text.includes('econnreset') ||
-    text.includes('epipe') ||
-    code === 'ETIMEDOUT' ||
-    code === 'ECONNRESET' ||
-    code === 'EPIPE'
-  )
-}
-
-const sendMailWithFallback = async (mailOptions) => {
-  try {
-    return await primaryTransporter.sendMail(mailOptions)
-  } catch (error) {
-    if (!canUseGmailFallback() || !isNetworkTransportError(error)) throw error
-    logger.warn('Primary Gmail SMTP (465) failed; retrying with STARTTLS on port 587')
-    const fallbackTransporter = createTransporter({
+  const gmailHost = /smtp\.gmail\.com/i.test(String(smtpHost || ''))
+  if (gmailHost) {
+    push({
+      name: 'gmail-starttls',
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
       requireTLS: true,
     })
-    return fallbackTransporter.sendMail(mailOptions)
+    push({
+      name: 'gmail-ssl',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      requireTLS: false,
+    })
+  }
+
+  return result
+}
+
+const sendMailViaSmtp = async (mailOptions) => {
+  let lastError = null
+  for (const candidate of smtpCandidates()) {
+    try {
+      const transporter = createTransporter(candidate)
+      const info = await transporter.sendMail(mailOptions)
+      if (candidate.name !== 'primary') {
+        logger.warn(`SMTP delivery succeeded via fallback (${candidate.name})`)
+      }
+      return info
+    } catch (error) {
+      lastError = error
+      logger.warn(
+        `SMTP delivery failed via ${candidate.name} (${candidate.host}:${candidate.port}, secure=${candidate.secure}): ${error.message}`
+      )
+    }
+  }
+  throw lastError || new Error('SMTP delivery failed')
+}
+
+const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
+  if (!brevoApiEnabled) throw new Error('BREVO_API_KEY is not configured')
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'api-key': brevoApiKey,
+    },
+    body: JSON.stringify({
+      sender: {
+        email: smtpFromEmail,
+        name: smtpFromName,
+      },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text,
+    }),
+  })
+
+  const raw = await response.text()
+  if (!response.ok) throw new Error(`Brevo API ${response.status}: ${raw.slice(0, 220)}`)
+
+  let parsed = null
+  try {
+    parsed = raw ? JSON.parse(raw) : null
+  } catch {
+    parsed = null
+  }
+
+  return {
+    messageId: parsed?.messageId || null,
+    response: `Brevo API ${response.status}`,
   }
 }
 
@@ -94,29 +156,56 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
   const subjects = { EMAIL_VERIFY:'Verify your UniFi email', LOGIN:'Your UniFi login OTP', UPI_VERIFY:'Verify your UPI ID' }
   const subject = subjects[purpose] || 'UniFi OTP'
   const text = `Your UniFi OTP is ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111;">
+      <h2 style="margin-bottom:8px;">UniFi OTP</h2>
+      <p>Your one-time password is:</p>
+      <p style="font-size:30px;font-weight:700;letter-spacing:4px;margin:8px 0;">${otp}</p>
+      <p>This OTP expires in 10 minutes.</p>
+      <p style="font-size:12px;color:#666;">If you did not request this, ignore this email.</p>
+    </div>
+  `
+
   try {
-    const info = await sendMailWithFallback({
+    const info = await sendMailViaSmtp({
       from: smtpFrom,
       to: email,
       subject,
       text,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#111;">
-          <h2 style="margin-bottom:8px;">UniFi OTP</h2>
-          <p>Your one-time password is:</p>
-          <p style="font-size:30px;font-weight:700;letter-spacing:4px;margin:8px 0;">${otp}</p>
-          <p>This OTP expires in 10 minutes.</p>
-          <p style="font-size:12px;color:#666;">If you did not request this, ignore this email.</p>
-        </div>
-      `,
+      html,
     })
     logger.info(`OTP sent to ${email} (messageId=${info.messageId || 'n/a'}, response=${info.response || 'n/a'})`)
     return { sent: true, channel: 'email', response: info.response, messageId: info.messageId }
-  } catch(e) {
-    logger.warn(`Email failed (${email}): ${e.message}`)
-    if (strict) throw e
+  } catch (smtpError) {
+    logger.warn(`Email SMTP failed (${email}): ${smtpError.message}`)
+    if (brevoApiEnabled) {
+      try {
+        const info = await sendMailViaBrevoApi({
+          to: email,
+          subject,
+          text,
+          html,
+        })
+        logger.info(
+          `OTP sent to ${email} via Brevo API (messageId=${info.messageId || 'n/a'}, response=${info.response})`
+        )
+        return {
+          sent: true,
+          channel: 'email',
+          provider: 'BREVO_API',
+          response: info.response,
+          messageId: info.messageId,
+        }
+      } catch (brevoError) {
+        logger.warn(`Email Brevo fallback failed (${email}): ${brevoError.message}`)
+        if (strict) throw brevoError
+        if (process.env.NODE_ENV === 'development') logger.info(`DEV OTP for ${email}: ${otp}`)
+        return { sent: false, channel: 'email', error: brevoError.message }
+      }
+    }
+    if (strict) throw smtpError
     if (process.env.NODE_ENV === 'development') logger.info(`DEV OTP for ${email}: ${otp}`)
-    return { sent: false, channel: 'email', error: e.message }
+    return { sent: false, channel: 'email', error: smtpError.message }
   }
 }
 

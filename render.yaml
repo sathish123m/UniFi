@@ -37,8 +37,6 @@ services:
 
       - key: EXPOSE_DEV_OTP
         value: false
-      - key: AUTH_REQUIRE_EMAIL_VERIFIED
-        value: true
       - key: ALLOWED_UNIVERSITY_DOMAINS
         value: lpu.in,rguktn.ac.in
       - key: ALLOWED_UNIVERSITY_DOMAIN
@@ -82,6 +80,8 @@ services:
       - key: SMTP_PASS
         sync: false
       - key: SMTP_FROM
+        sync: false
+      - key: BREVO_API_KEY
         sync: false
       - key: DB_SEED_ON_DEPLOY
         value: true
