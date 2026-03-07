@@ -57,6 +57,8 @@ services:
         value: smtp.gmail.com
       - key: SMTP_PORT
         value: 465
+      - key: EMAIL_PROVIDER
+        value: SMTP
       - key: SMTP_SECURE
         value: true
       - key: SMTP_REQUIRE_TLS
@@ -83,6 +85,18 @@ services:
         sync: false
       - key: BREVO_API_KEY
         sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        value: UniFi
+      - key: MAILJET_API_KEY
+        sync: false
+      - key: MAILJET_API_SECRET
+        sync: false
+      - key: MAILJET_SENDER_EMAIL
+        sync: false
+      - key: MAILJET_SENDER_NAME
+        value: UniFi
       - key: DB_SEED_ON_DEPLOY
         value: true
       - key: SEED_TEST_USERS

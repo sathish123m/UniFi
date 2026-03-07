@@ -3,6 +3,7 @@ const logger = require('../config/logger')
 const prisma = require('../config/db')
 const { createId } = require('@paralleldrive/cuid2')
 
+const emailProvider = String(process.env.EMAIL_PROVIDER || 'SMTP').trim().toUpperCase()
 const smtpPort = Number(process.env.SMTP_PORT || '587')
 const smtpSecure = process.env.SMTP_SECURE
   ? String(process.env.SMTP_SECURE).toLowerCase() === 'true'
@@ -26,6 +27,13 @@ const strictSmsDelivery = String(process.env.SMS_STRICT || 'false').toLowerCase(
 const smsRealEnabled = smsProvider === 'TWILIO'
 const brevoApiKey = String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim()
 const brevoApiEnabled = Boolean(brevoApiKey)
+const brevoSenderEmail = String(process.env.BREVO_SENDER_EMAIL || '').trim() || smtpFromEmail
+const brevoSenderName = String(process.env.BREVO_SENDER_NAME || '').trim() || smtpFromName
+const mailjetApiKey = String(process.env.MAILJET_API_KEY || process.env.SMTP_USER || '').trim()
+const mailjetApiSecret = String(process.env.MAILJET_API_SECRET || process.env.SMTP_PASS || '').trim()
+const mailjetApiEnabled = Boolean(mailjetApiKey && mailjetApiSecret)
+const mailjetSenderEmail = String(process.env.MAILJET_SENDER_EMAIL || '').trim() || smtpFromEmail
+const mailjetSenderName = String(process.env.MAILJET_SENDER_NAME || '').trim() || smtpFromName
 if (
   /mailjet/i.test(String(process.env.SMTP_HOST || '')) &&
   /@gmail\.com$/i.test(String(smtpFromAddress).trim())
@@ -120,8 +128,8 @@ const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
     },
     body: JSON.stringify({
       sender: {
-        email: smtpFromEmail,
-        name: smtpFromName,
+        email: brevoSenderEmail,
+        name: brevoSenderName,
       },
       to: [{ email: to }],
       subject,
@@ -131,7 +139,16 @@ const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
   })
 
   const raw = await response.text()
-  if (!response.ok) throw new Error(`Brevo API ${response.status}: ${raw.slice(0, 220)}`)
+  if (!response.ok) {
+    let details = raw
+    try {
+      const parsed = raw ? JSON.parse(raw) : null
+      details = parsed?.message || parsed?.code || raw
+    } catch {
+      details = raw
+    }
+    throw new Error(`Brevo API ${response.status}: ${String(details || '').slice(0, 220)}`)
+  }
 
   let parsed = null
   try {
@@ -143,6 +160,51 @@ const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
   return {
     messageId: parsed?.messageId || null,
     response: `Brevo API ${response.status}`,
+  }
+}
+
+const sendMailViaMailjetApi = async ({ to, subject, text, html }) => {
+  if (!mailjetApiEnabled) throw new Error('MAILJET_API_KEY/MAILJET_API_SECRET are not configured')
+  const auth = Buffer.from(`${mailjetApiKey}:${mailjetApiSecret}`).toString('base64')
+  const response = await fetch('https://api.mailjet.com/v3.1/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Basic ${auth}`,
+    },
+    body: JSON.stringify({
+      Messages: [
+        {
+          From: {
+            Email: mailjetSenderEmail,
+            Name: mailjetSenderName,
+          },
+          To: [{ Email: to }],
+          Subject: subject,
+          TextPart: text,
+          HTMLPart: html,
+        },
+      ],
+    }),
+  })
+
+  const raw = await response.text()
+  if (!response.ok) throw new Error(`Mailjet API ${response.status}: ${raw.slice(0, 220)}`)
+
+  let parsed = null
+  try {
+    parsed = raw ? JSON.parse(raw) : null
+  } catch {
+    parsed = null
+  }
+
+  const first = parsed?.Messages?.[0]
+  const firstTo = first?.To?.[0]
+  return {
+    messageId: firstTo?.MessageID || firstTo?.MessageUUID || null,
+    response: `Mailjet API ${response.status}`,
+    status: first?.Status || null,
   }
 }
 
@@ -167,6 +229,44 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
   `
 
   try {
+    if (emailProvider === 'MAILJET_API') {
+      const info = await sendMailViaMailjetApi({
+        to: email,
+        subject,
+        text,
+        html,
+      })
+      logger.info(
+        `OTP sent to ${email} via Mailjet API primary (messageId=${info.messageId || 'n/a'}, response=${info.response}, status=${info.status || 'n/a'})`
+      )
+      return {
+        sent: true,
+        channel: 'email',
+        provider: 'MAILJET_API',
+        response: info.response,
+        messageId: info.messageId,
+      }
+    }
+
+    if (emailProvider === 'BREVO_API') {
+      const info = await sendMailViaBrevoApi({
+        to: email,
+        subject,
+        text,
+        html,
+      })
+      logger.info(
+        `OTP sent to ${email} via Brevo API primary (messageId=${info.messageId || 'n/a'}, response=${info.response})`
+      )
+      return {
+        sent: true,
+        channel: 'email',
+        provider: 'BREVO_API',
+        response: info.response,
+        messageId: info.messageId,
+      }
+    }
+
     const info = await sendMailViaSmtp({
       from: smtpFrom,
       to: email,
