@@ -104,7 +104,12 @@ async function main() {
 
     // Demo Borrower
     await prisma.user.upsert({
-      where: { email: `borrower@${allowedDomain}` },
+      where: {
+        email_role: {
+          email: `borrower@${allowedDomain}`,
+          role: 'BORROWER',
+        },
+      },
       update: {},
       create: {
         id: 'demo_borrower_001',
@@ -127,7 +132,12 @@ async function main() {
 
     // Demo Provider
     await prisma.user.upsert({
-      where: { email: `provider@${allowedDomain}` },
+      where: {
+        email_role: {
+          email: `provider@${allowedDomain}`,
+          role: 'PROVIDER',
+        },
+      },
       update: {},
       create: {
         id: 'demo_provider_001',
@@ -149,7 +159,12 @@ async function main() {
 
     // Demo Pending KYC user
     await prisma.user.upsert({
-      where: { email: `newuser@${allowedDomain}` },
+      where: {
+        email_role: {
+          email: `newuser@${allowedDomain}`,
+          role: 'BORROWER',
+        },
+      },
       update: {},
       create: {
         id: 'demo_pending_001',
