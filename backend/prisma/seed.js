@@ -19,37 +19,72 @@ const encrypt = (text) => {
 
 async function main() {
   console.log('🌱 Seeding UniFi database...\n')
-  const allowedDomain = String(process.env.ALLOWED_UNIVERSITY_DOMAIN || 'lpu.in').trim().toLowerCase()
-  const allowedUniversityId = 'uni_lpu'
+  const allowedDomains = String(
+    process.env.ALLOWED_UNIVERSITY_DOMAINS ||
+      process.env.ALLOWED_UNIVERSITY_DOMAIN ||
+      'lpu.in,rguktn.ac.in'
+  )
+    .split(',')
+    .map((d) => d.trim().toLowerCase())
+    .filter((d) => d)
+
+  const uniqueAllowedDomains = [...new Set(allowedDomains)]
+  const primaryDomain = uniqueAllowedDomains[0] || 'lpu.in'
+  const universityMeta = {
+    'lpu.in': {
+      id: 'uni_lpu',
+      name: 'Lovely Professional University',
+      shortName: 'LPU',
+      city: 'Phagwara',
+      state: 'Punjab',
+    },
+    'rguktn.ac.in': {
+      id: 'uni_rguktn',
+      name: 'Rajiv Gandhi University of Knowledge and Technologies',
+      shortName: 'RGUKT',
+      city: 'Basar',
+      state: 'Telangana',
+    },
+  }
+  const primaryUniversityId =
+    universityMeta[primaryDomain]?.id || `uni_${primaryDomain.replace(/[^a-z0-9]+/g, '_')}`
 
   // ── Universities ──────────────────────────────────────
   console.log('📍 Creating universities...')
-  const uni = {
-    id: allowedUniversityId,
-    name: 'Lovely Professional University',
-    shortName: 'LPU',
-    emailDomain: allowedDomain,
-    city: 'Phagwara',
-    state: 'Punjab',
-    isActive: true,
-  }
+  for (const domain of uniqueAllowedDomains) {
+    const meta = universityMeta[domain] || {
+      id: `uni_${domain.replace(/[^a-z0-9]+/g, '_')}`,
+      name: domain,
+      shortName: domain.split('.')[0].toUpperCase(),
+      city: 'Unknown',
+      state: 'Unknown',
+    }
 
-  await prisma.university.upsert({
-    where: { emailDomain: uni.emailDomain },
-    update: {
-      name: uni.name,
-      shortName: uni.shortName,
-      city: uni.city,
-      state: uni.state,
-      isActive: true,
-    },
-    create: uni,
-  })
+    await prisma.university.upsert({
+      where: { emailDomain: domain },
+      update: {
+        name: meta.name,
+        shortName: meta.shortName,
+        city: meta.city,
+        state: meta.state,
+        isActive: true,
+      },
+      create: {
+        id: meta.id,
+        name: meta.name,
+        shortName: meta.shortName,
+        emailDomain: domain,
+        city: meta.city,
+        state: meta.state,
+        isActive: true,
+      },
+    })
+  }
   await prisma.university.updateMany({
-    where: { emailDomain: { not: allowedDomain } },
+    where: { emailDomain: { notIn: uniqueAllowedDomains } },
     data: { isActive: false },
   })
-  console.log(`   ✓ 1 university active (${allowedDomain})\n`)
+  console.log(`   ✓ ${uniqueAllowedDomains.length} universities active (${uniqueAllowedDomains.join(', ')})\n`)
 
   // ── Platform Config ───────────────────────────────────
   console.log('⚙️  Creating default platform config...')
@@ -106,19 +141,19 @@ async function main() {
     await prisma.user.upsert({
       where: {
         email_role: {
-          email: `borrower@${allowedDomain}`,
+          email: `borrower@${primaryDomain}`,
           role: 'BORROWER',
         },
       },
       update: {},
       create: {
         id: 'demo_borrower_001',
-        email: `borrower@${allowedDomain}`,
+        email: `borrower@${primaryDomain}`,
         passwordHash: demoPass,
         role: 'BORROWER',
         firstName: 'Arjun',
         lastName: 'Sharma',
-        universityId: allowedUniversityId,
+        universityId: primaryUniversityId,
         studentIdNumber: 'LPU20CSE0042',
         kycStatus: 'APPROVED',
         emailVerified: true,
@@ -134,19 +169,19 @@ async function main() {
     await prisma.user.upsert({
       where: {
         email_role: {
-          email: `provider@${allowedDomain}`,
+          email: `provider@${primaryDomain}`,
           role: 'PROVIDER',
         },
       },
       update: {},
       create: {
         id: 'demo_provider_001',
-        email: `provider@${allowedDomain}`,
+        email: `provider@${primaryDomain}`,
         passwordHash: demoPass,
         role: 'PROVIDER',
         firstName: 'Rohan',
         lastName: 'Mehta',
-        universityId: allowedUniversityId,
+        universityId: primaryUniversityId,
         studentIdNumber: 'LPU20CSE0089',
         kycStatus: 'APPROVED',
         emailVerified: true,
@@ -161,28 +196,28 @@ async function main() {
     await prisma.user.upsert({
       where: {
         email_role: {
-          email: `newuser@${allowedDomain}`,
+          email: `newuser@${primaryDomain}`,
           role: 'BORROWER',
         },
       },
       update: {},
       create: {
         id: 'demo_pending_001',
-        email: `newuser@${allowedDomain}`,
+        email: `newuser@${primaryDomain}`,
         passwordHash: demoPass,
         role: 'BORROWER',
         firstName: 'Priya',
         lastName: 'Nair',
-        universityId: allowedUniversityId,
+        universityId: primaryUniversityId,
         kycStatus: 'PENDING',
         emailVerified: true,
         isActive: true,
       },
     })
 
-    console.log(`   ✓ Demo borrower  → borrower@${allowedDomain} / Demo@1234`)
-    console.log(`   ✓ Demo provider  → provider@${allowedDomain} / Demo@1234`)
-    console.log(`   ✓ Demo pending   → newuser@${allowedDomain} / Demo@1234\n`)
+    console.log(`   ✓ Demo borrower  → borrower@${primaryDomain} / Demo@1234`)
+    console.log(`   ✓ Demo provider  → provider@${primaryDomain} / Demo@1234`)
+    console.log(`   ✓ Demo pending   → newuser@${primaryDomain} / Demo@1234\n`)
 
     // Demo Loan (active)
     console.log('💳 Creating demo loan...')
