@@ -26,6 +26,20 @@ const tryWithRetries = async (fn, { retries = 3, delay = 1000, factor = 2, name 
   throw err
 }
 
+const withTimeout = async (promiseFactory, timeoutMs, name) => {
+  let timer = null
+  try {
+    return await Promise.race([
+      promiseFactory(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${name} timed out after ${timeoutMs}ms`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 const checkPrisma = async () => {
   // Prisma will lazily connect on first query but calling $connect ensures we have DB connectivity now
   await tryWithRetries(() => prisma.$connect(), { retries: 3, delay: 1000, factor: 2, name: 'Prisma connect' })
@@ -42,12 +56,20 @@ const checkRedis = async () => {
     // ignore
   }
 
-  await tryWithRetries(() => redis.connect(), { retries: 4, delay: 500, factor: 2, name: 'Redis connect' })
+  const redisRequired = String(process.env.REDIS_REQUIRED || 'false').toLowerCase() === 'true'
+  const timeoutMs = Number(process.env.REDIS_STARTUP_TIMEOUT_MS || process.env.REDIS_CONNECT_TIMEOUT_MS || 5000)
+
   try {
-    const pong = await redis.ping()
+    await tryWithRetries(
+      () => withTimeout(() => redis.connect(), timeoutMs, 'Redis connect'),
+      { retries: 4, delay: 500, factor: 2, name: 'Redis connect' }
+    )
+
+    const pong = await withTimeout(() => redis.ping(), timeoutMs, 'Redis ping')
     logger.info(`✅ Redis ping: ${pong}`)
   } catch (e) {
-    logger.warn(`Redis ping failed: ${e.message}`)
+    if (redisRequired) throw e
+    logger.warn(`Redis unavailable during startup, continuing without Redis readiness: ${e.message}`)
   }
 }
 

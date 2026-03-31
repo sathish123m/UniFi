@@ -37,6 +37,8 @@ const normalizeRedisUrl = (raw) => {
 }
 
 const redis = new Redis(normalizeRedisUrl(process.env.REDIS_URL), {
+  connectTimeout: Number(process.env.REDIS_CONNECT_TIMEOUT_MS || 5000),
+  enableOfflineQueue: false,
   maxRetriesPerRequest: 3,
   retryStrategy: (times) => Math.min(times * 50, 2000),
   lazyConnect: true,
