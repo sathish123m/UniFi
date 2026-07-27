@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const prisma = require("../config/db");
 const {
   signAccessToken,
@@ -14,6 +15,29 @@ const {
 } = require("../utils/otp");
 const { sendOtpChannels, smsRealEnabled } = require("./notification.service");
 const { createId } = require("@paralleldrive/cuid2");
+
+const recordDeviceSession = async (userId, reqInfo = {}) => {
+  try {
+    const { ipAddress = "127.0.0.1", userAgent = "Unknown", fingerprint } = reqInfo;
+    const fp = fingerprint || crypto.createHash("sha256").update(`${ipAddress}-${userAgent}`).digest("hex");
+
+    await prisma.deviceSession.upsert({
+      where: {
+        userId_fingerprint: { userId, fingerprint: fp },
+      },
+      update: { lastSeenAt: new Date(), ipAddress, userAgent },
+      create: {
+        id: createId(),
+        userId,
+        fingerprint: fp,
+        ipAddress,
+        userAgent,
+      },
+    });
+  } catch (e) {
+    // Non-blocking device session recording
+  }
+};
 const {
   allowedEmailDomains,
   allowedEmailSuffixes,
@@ -230,7 +254,7 @@ const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
   return issueTokens(matched.user);
 };
 
-const login = async ({ email, password, requestedRole }) => {
+const login = async ({ email, password, requestedRole }, reqInfo = {}) => {
   const normalizedEmail = normalizeEmail(email);
   const requested = normalizeRequestedRole(requestedRole);
   const accounts = await prisma.user.findMany({
@@ -259,6 +283,7 @@ const login = async ({ email, password, requestedRole }) => {
       where: { id: matched.id },
       data: { lastLoginAt: new Date() },
     });
+    await recordDeviceSession(matched.id, reqInfo);
     return issueTokens(matched);
   }
 
@@ -295,6 +320,7 @@ const login = async ({ email, password, requestedRole }) => {
     where: { id: matchCandidate.id },
     data: { lastLoginAt: new Date() },
   });
+  await recordDeviceSession(matchCandidate.id, reqInfo);
   return issueTokens(matchCandidate);
 };
 
@@ -380,6 +406,68 @@ const resendOtp = async (email, purpose, requestedRole) => {
   };
 };
 
+const forgotPassword = async ({ email, requestedRole }) => {
+  const normalizedEmail = normalizeEmail(email);
+  const requested = normalizeRequestedRole(requestedRole);
+
+  const users = await findUsersByPortal(normalizedEmail, requested);
+  if (!users.length) {
+    return { message: "If an account exists with this email, a password reset OTP has been sent." };
+  }
+
+  const targetUser = users[0];
+  const otp = await sendOtp(targetUser.id, normalizedEmail, "PASSWORD_RESET");
+
+  return {
+    message: "If an account exists with this email, a password reset OTP has been sent.",
+    ...(exposeDevOtp && { devOtp: otp }),
+  };
+};
+
+const resetPassword = async ({ email, otp, newPassword, requestedRole }) => {
+  const normalizedEmail = normalizeEmail(email);
+  const requested = normalizeRequestedRole(requestedRole);
+
+  const users = await findUsersByPortal(normalizedEmail, requested);
+  if (!users.length) throw err("Invalid request or OTP expired", 400);
+
+  const targetUser = users[0];
+
+  const otpRecord = await prisma.otpCode.findFirst({
+    where: {
+      userId: targetUser.id,
+      purpose: "PASSWORD_RESET",
+      used: false,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!otpRecord) throw err("Invalid or expired OTP", 400);
+
+  const isValid = await verifyOtp(otp, otpRecord.code);
+  if (!isValid) throw err("Invalid or expired OTP", 400);
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  await prisma.$transaction([
+    prisma.otpCode.update({
+      where: { id: otpRecord.id },
+      data: { used: true },
+    }),
+    prisma.user.update({
+      where: { id: targetUser.id },
+      data: { passwordHash },
+    }),
+    prisma.refreshToken.updateMany({
+      where: { userId: targetUser.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
+
+  return { message: "Password reset successful. You may now log in with your new password." };
+};
+
 module.exports = {
   register,
   login,
@@ -387,4 +475,6 @@ module.exports = {
   refresh,
   logout,
   resendOtp,
+  forgotPassword,
+  resetPassword,
 };

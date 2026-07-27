@@ -20,6 +20,9 @@ router.get('/:id', async (req,res) => ok(res, await loanSvc.getLoan(req.params.i
 // Fund a loan (providers only)
 router.post('/:id/fund', restrictTo('PROVIDER'), requireKyc, requireUpi, async (req,res) => ok(res, await loanSvc.fundLoan(req.user.id, req.params.id)))
 
+// Cancel loan request (borrowers only)
+router.post('/:id/cancel', restrictTo('BORROWER'), async (req,res) => ok(res, await loanSvc.cancelLoan(req.user.id, req.params.id), 'Loan request cancelled'))
+
 // Get platform config (for loan calculator in frontend)
 router.get('/meta/config', async (req,res) => ok(res, await loanSvc.getConfig()))
 

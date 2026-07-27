@@ -107,6 +107,23 @@ const refreshLoanDelinquency = async (loanId, now = new Date()) => {
 
 const sweepDelinquency = async () => {
   const now = new Date()
+  const cfg = await getConfig()
+  const acceptWindowHours = Number(cfg.providerAcceptWindowHours) || 24
+  const expiredCutoff = new Date(now.getTime() - acceptWindowHours * 60 * 60 * 1000)
+
+  // Auto-cancel unfunded PENDING loans older than acceptWindowHours
+  const expiredPendingResult = await prisma.loan.updateMany({
+    where: {
+      status: 'PENDING',
+      requestedAt: { lt: expiredCutoff },
+      isArchived: false,
+    },
+    data: {
+      status: 'CANCELLED',
+      cancelledAt: now,
+    },
+  })
+
   const loans = await prisma.loan.findMany({
     where: {
       status: { in: ['ACTIVE', 'DEFAULTED'] },
@@ -116,7 +133,7 @@ const sweepDelinquency = async () => {
     select: { id: true, status: true, isOverdue: true, overdueDays: true, lateFeeAmount: true },
   })
 
-  let updated = 0
+  let updated = expiredPendingResult.count
   let defaulted = 0
   let overdue = 0
 
@@ -137,7 +154,8 @@ const sweepDelinquency = async () => {
   }
 
   return {
-    scanned: loans.length,
+    scanned: loans.length + expiredPendingResult.count,
+    expiredPendingCancelled: expiredPendingResult.count,
     updated,
     overdue,
     defaulted,
@@ -366,10 +384,33 @@ const getLoan = async (loanId, userId) => {
   return loan
 }
 
+const cancelLoan = async (userId, loanId) => {
+  const loan = await prisma.loan.findUnique({ where: { id: loanId } })
+  if (!loan) throw err('Loan not found', 404)
+  if (loan.borrowerId !== userId) throw err('Access denied', 403)
+  if (loan.status !== 'PENDING') throw err('Can only cancel pending loan requests', 400)
+
+  const updated = await prisma.loan.update({
+    where: { id: loanId },
+    data: { status: 'CANCELLED', cancelledAt: new Date() },
+  })
+
+  await createNotification(
+    userId,
+    'GENERAL',
+    'Loan Request Cancelled',
+    `Your loan request ${loan.publicId} has been cancelled.`,
+    { loanId }
+  )
+
+  return updated
+}
+
 module.exports = {
   createLoan,
   getMarketplace,
   fundLoan,
+  cancelLoan,
   sweepDelinquency,
   refreshLoanDelinquency,
   getRepaymentPayable,

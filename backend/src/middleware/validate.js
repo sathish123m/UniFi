@@ -100,6 +100,46 @@ const upiSchema = z.object({
   }),
 });
 
+const platformConfigSchema = z.object({
+  body: z.object({
+    interestRatePercent: z.number().positive().max(100).optional(),
+    platformFeePercent: z.number().min(0).max(100).optional(),
+    minLoanAmount: z.number().int().positive().optional(),
+    maxLoanAmount: z.number().int().positive().optional(),
+    scoreTier1MinScore: z.number().int().min(300).max(900).optional(),
+    scoreTier1Limit: z.number().int().positive().optional(),
+    scoreTier2MinScore: z.number().int().min(300).max(900).optional(),
+    scoreTier2Limit: z.number().int().positive().optional(),
+    scoreTier3MinScore: z.number().int().min(300).max(900).optional(),
+    scoreTier3Limit: z.number().int().positive().optional(),
+    providerAcceptWindowHours: z.number().int().positive().optional(),
+    providerFundWindowHours: z.number().int().positive().optional(),
+  }),
+});
+
+const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: z.string().trim().email(),
+    requestedRole: z.enum(["BORROWER", "PROVIDER", "ADMIN"]).optional(),
+  }),
+});
+
+const resetPasswordSchema = z.object({
+  body: z.object({
+    email: z.string().trim().email(),
+    otp: z.string().length(6).regex(/^\d+$/, "OTP must be numeric"),
+    newPassword: z
+      .string()
+      .min(8)
+      .max(72)
+      .regex(/[A-Z]/, "Must include uppercase")
+      .regex(/[a-z]/, "Must include lowercase")
+      .regex(/[0-9]/, "Must include number")
+      .regex(/[^A-Za-z0-9]/, "Must include special character"),
+    requestedRole: z.enum(["BORROWER", "PROVIDER", "ADMIN"]).optional(),
+  }),
+});
+
 module.exports = {
   validate,
   registerSchema,
@@ -107,4 +147,7 @@ module.exports = {
   verifyOtpSchema,
   loanRequestSchema,
   upiSchema,
+  platformConfigSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 };

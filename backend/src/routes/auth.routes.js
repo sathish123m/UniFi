@@ -7,6 +7,8 @@ const {
   registerSchema,
   loginSchema,
   verifyOtpSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } = require("../middleware/validate");
 const {
   authRateLimiter,
@@ -50,7 +52,14 @@ router.post(
   "/login",
   authRateLimiter,
   validate(loginSchema),
-  async (req, res) => ok(res, await authSvc.login(req.body)),
+  async (req, res) =>
+    ok(
+      res,
+      await authSvc.login(req.body, {
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      }),
+    ),
 );
 router.post(
   "/verify-otp",
@@ -67,6 +76,12 @@ router.post("/resend-otp", otpRateLimiter, async (req, res) =>
       req.body.requestedRole,
     ),
   ),
+);
+router.post("/forgot-password", otpRateLimiter, validate(forgotPasswordSchema), async (req, res) =>
+  ok(res, await authSvc.forgotPassword(req.body)),
+);
+router.post("/reset-password", authRateLimiter, validate(resetPasswordSchema), async (req, res) =>
+  ok(res, await authSvc.resetPassword(req.body)),
 );
 router.post("/refresh", async (req, res) =>
   ok(res, await authSvc.refresh(req.body.refreshToken)),

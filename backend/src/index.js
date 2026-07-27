@@ -104,6 +104,29 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
+const { sweepDelinquency } = require('./services/loan.service')
+
+const startBackgroundJobs = () => {
+  const SWEEP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
+  setTimeout(async () => {
+    try {
+      const stats = await sweepDelinquency()
+      logger.info(`[Background Job] Initial delinquency sweep: ${JSON.stringify(stats)}`)
+    } catch (e) {
+      logger.error(`[Background Job] Initial delinquency sweep failed: ${e.message}`)
+    }
+  }, 10000)
+
+  setInterval(async () => {
+    try {
+      const stats = await sweepDelinquency()
+      logger.info(`[Background Job] Scheduled delinquency sweep: ${JSON.stringify(stats)}`)
+    } catch (e) {
+      logger.error(`[Background Job] Scheduled delinquency sweep failed: ${e.message}`)
+    }
+  }, SWEEP_INTERVAL_MS)
+}
+
 const start = async () => {
   try {
     await checkAndConnectAll();
@@ -111,6 +134,7 @@ const start = async () => {
       logger.info(`UniFi API -> http://localhost:${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
       logger.info(`Payment provider: ${paymentProvider()}`);
+      startBackgroundJobs();
     });
   } catch (e) {
     logger.error(`Startup failed: ${e.message}`);

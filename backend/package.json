@@ -20,8 +20,9 @@
     "payment:test": "node src/scripts/paymentTest.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.0",
+    "@aws-sdk/client-s3": "^3.1095.0",
     "@paralleldrive/cuid2": "^2.2.2",
+    "@prisma/client": "^5.10.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",

@@ -138,7 +138,7 @@ async function main() {
     const demoPass = await bcrypt.hash('Demo@1234', 12)
 
     // Demo Borrower
-    await prisma.user.upsert({
+    const demoBorrower = await prisma.user.upsert({
       where: {
         email_role: {
           email: `borrower@${primaryDomain}`,
@@ -166,7 +166,7 @@ async function main() {
     })
 
     // Demo Provider
-    await prisma.user.upsert({
+    const demoProvider = await prisma.user.upsert({
       where: {
         email_role: {
           email: `provider@${primaryDomain}`,
@@ -228,8 +228,8 @@ async function main() {
       await prisma.loan.create({
         data: {
           id: 'demo_loan_001',
-          borrowerId: 'demo_borrower_001',
-          providerId: 'demo_provider_001',
+          borrowerId: demoBorrower.id,
+          providerId: demoProvider.id,
           principalAmount: 2000,
           interestAmount: 100,
           platformFeeAmount: 10,

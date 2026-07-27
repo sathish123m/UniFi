@@ -7,8 +7,10 @@ const { ok } = require('../utils/response')
 const multer = require('multer')
 const { createId } = require('@paralleldrive/cuid2')
 
+const storageService = require('../services/storage.service')
+
 const upload = multer({
-  dest: 'uploads/kyc/',
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'image/webp']
@@ -108,13 +110,40 @@ router.post(
     const existing = await prisma.kycDocument.findUnique({ where: { userId: req.user.id } })
     if (existing) return res.status(409).json({ success: false, message: 'KYC already submitted' })
 
+    const frontFile = req.files.studentIdFront[0]
+    const selfieFile = req.files.selfie[0]
+    const backFile = req.files.studentIdBack?.[0]
+
+    const [frontRes, selfieRes, backRes] = await Promise.all([
+      storageService.uploadFile({
+        buffer: frontFile.buffer,
+        originalname: frontFile.originalname,
+        mimetype: frontFile.mimetype,
+        folder: 'kyc',
+      }),
+      storageService.uploadFile({
+        buffer: selfieFile.buffer,
+        originalname: selfieFile.originalname,
+        mimetype: selfieFile.mimetype,
+        folder: 'kyc',
+      }),
+      backFile
+        ? storageService.uploadFile({
+            buffer: backFile.buffer,
+            originalname: backFile.originalname,
+            mimetype: backFile.mimetype,
+            folder: 'kyc',
+          })
+        : Promise.resolve(null),
+    ])
+
     await prisma.kycDocument.create({
       data: {
         id: createId(),
         userId: req.user.id,
-        studentIdFrontKey: req.files.studentIdFront[0].path,
-        studentIdBackKey: req.files.studentIdBack?.[0]?.path || null,
-        selfieKey: req.files.selfie[0].path,
+        studentIdFrontKey: frontRes.key,
+        studentIdBackKey: backRes ? backRes.key : null,
+        selfieKey: selfieRes.key,
       },
     })
 

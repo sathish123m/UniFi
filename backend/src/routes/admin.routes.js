@@ -4,6 +4,7 @@ const prisma = require('../config/db')
 const { protect, restrictTo } = require('../middleware/auth')
 const { ok } = require('../utils/response')
 const { createId } = require('@paralleldrive/cuid2')
+const { validate, platformConfigSchema } = require('../middleware/validate')
 const loanSvc = require('../services/loan.service')
 
 const isAdmin = [protect, restrictTo('SUPER_ADMIN', 'MOD_ADMIN', 'FINANCE_ADMIN')]
@@ -273,7 +274,7 @@ router.get('/config', async (req, res) => {
   ok(res, await prisma.platformConfig.findFirst({ orderBy: { createdAt: 'desc' } }))
 })
 
-router.post('/config', restrictTo('SUPER_ADMIN', 'FINANCE_ADMIN'), async (req, res) => {
+router.post('/config', restrictTo('SUPER_ADMIN', 'FINANCE_ADMIN'), validate(platformConfigSchema), async (req, res) => {
   const cfg = await prisma.platformConfig.create({
     data: {
       id: createId(),
