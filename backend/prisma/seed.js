@@ -109,23 +109,26 @@ async function main() {
 
   // ── Super Admin ───────────────────────────────────────
   console.log('🛡️  Creating super admin...')
-  const adminPassword = await bcrypt.hash('Admin@UniFi#2025', 12)
+  const adminPassword = await bcrypt.hash('Sathish@123', 12)
   await prisma.user.upsert({
     where: { id: 'admin_super_001' },
-    update: {},
+    update: {
+      email: 'sathish085580@gmail.com',
+      passwordHash: adminPassword,
+    },
     create: {
       id: 'admin_super_001',
-      email: 'admin@unifi.campus',
+      email: 'sathish085580@gmail.com',
       passwordHash: adminPassword,
       role: 'SUPER_ADMIN',
-      firstName: 'UniFi',
+      firstName: 'Sathish',
       lastName: 'Admin',
       kycStatus: 'APPROVED',
       emailVerified: true,
       isActive: true,
     },
   })
-  console.log('   ✓ Super admin created → admin@unifi.campus\n')
+  console.log('   ✓ Super admin created → sathish085580@gmail.com / Sathish@123\n')
 
   // ── Demo Users (optional in production for test deployments) ──
   const seedTestUsers =
@@ -254,7 +257,7 @@ async function main() {
   console.log('✅ Seeding complete!\n')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('IMPORTANT: Change the admin password immediately!')
-  console.log('Admin: admin@unifi.campus / Admin@UniFi#2025')
+  console.log('Admin: sathish085580@gmail.com / Sathish@123')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 }
 

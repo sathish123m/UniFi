@@ -595,11 +595,25 @@ export default function AdminPanel() {
                   <div className="portal-row compact" key={a.id}>
                     <div className="portal-row-main">
                       <strong>
-                        {a.firstName} {a.lastName}
+                        {a.firstName} {a.lastName} {a.id === user.id ? '(You)' : ''}
                       </strong>
-                      <small>{a.role}</small>
+                      <small>
+                        {a.role} · {a.email} · {a.isBanned ? 'BANNED' : a.isSuspended ? 'SUSPENDED' : 'ACTIVE'}
+                      </small>
                     </div>
-                    <span>{a.email}</span>
+                    {a.role !== 'SUPER_ADMIN' && a.id !== user.id && (
+                      <div className="inline-actions">
+                        {!a.isSuspended && !a.isBanned ? (
+                          <button className="btn btn-ghost" type="button" onClick={() => changeUserStatus(a.id, 'SUSPEND')}>
+                            Suspend
+                          </button>
+                        ) : (
+                          <button className="btn btn-primary" type="button" onClick={() => changeUserStatus(a.id, 'RESTORE')}>
+                            Restore
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {!admins.length ? <p>No admins available.</p> : null}
