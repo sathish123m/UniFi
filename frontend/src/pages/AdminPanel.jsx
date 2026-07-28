@@ -368,30 +368,72 @@ export default function AdminPanel() {
           </div>
 
           <div className="portal-panel-card stack-sm">
-            {users.map((u) => (
-              <div className="portal-row" key={u.id}>
-                <div className="portal-row-main">
-                  <strong>
-                    {u.firstName} {u.lastName}
-                  </strong>
-                  <small>
-                    {u.email} · {u.role} · KYC {u.kycStatus} · {u.isBanned ? 'BANNED' : u.isSuspended ? 'SUSPENDED' : 'ACTIVE'}
-                  </small>
+            {users.map((u) => {
+              const statusTag = u.isBanned ? 'BANNED' : u.isSuspended ? 'SUSPENDED' : 'ACTIVE'
+              const badgeClass = u.isBanned
+                ? 'badge-danger'
+                : u.isSuspended
+                ? 'badge-warning'
+                : u.role === 'SUPER_ADMIN'
+                ? 'badge-gold'
+                : 'badge-success'
+
+              const isProtected = u.role === 'SUPER_ADMIN' || u.id === user?.id
+
+              return (
+                <div className="portal-row" key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="portal-row-main">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <strong>
+                        {u.firstName} {u.lastName}
+                      </strong>
+                      <span className={`chip ${badgeClass}`} style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 999 }}>
+                        {statusTag}
+                      </span>
+                    </div>
+                    <small style={{ color: 'var(--muted)' }}>
+                      {u.email} · <b style={{ color: 'var(--text)' }}>{u.role}</b> · KYC <b style={{ color: u.kycStatus === 'APPROVED' ? 'var(--green)' : 'var(--gold)' }}>{u.kycStatus}</b>
+                      {u.suspendReason ? ` · Reason: "${u.suspendReason}"` : ''}
+                    </small>
+                  </div>
+
+                  <div className="inline-actions">
+                    {isProtected ? (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontStyle: 'italic' }}>Protected Account</span>
+                    ) : (
+                      <>
+                        {!u.isSuspended && !u.isBanned && (
+                          <button
+                            className="btn btn-ghost"
+                            style={{ borderColor: 'rgba(245, 158, 11, 0.4)', color: '#f59e0b' }}
+                            type="button"
+                            onClick={() => changeUserStatus(u.id, 'SUSPEND')}
+                          >
+                            Suspend
+                          </button>
+                        )}
+                        {!u.isBanned && (
+                          <button
+                            className="btn btn-ghost"
+                            style={{ borderColor: 'rgba(239, 68, 68, 0.4)', color: '#ef4444' }}
+                            type="button"
+                            onClick={() => changeUserStatus(u.id, 'BAN')}
+                          >
+                            Ban
+                          </button>
+                        )}
+                        {(u.isSuspended || u.isBanned) && (
+                          <button className="btn btn-primary" type="button" onClick={() => changeUserStatus(u.id, 'RESTORE')}>
+                            Restore Account
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="inline-actions">
-                  <button className="btn btn-ghost" type="button" onClick={() => changeUserStatus(u.id, 'SUSPEND')}>
-                    Suspend
-                  </button>
-                  <button className="btn btn-ghost" type="button" onClick={() => changeUserStatus(u.id, 'BAN')}>
-                    Ban
-                  </button>
-                  <button className="btn btn-primary" type="button" onClick={() => changeUserStatus(u.id, 'RESTORE')}>
-                    Restore
-                  </button>
-                </div>
-              </div>
-            ))}
-            {!users.length ? <p>No users.</p> : null}
+              )
+            })}
+            {!users.length ? <p>No users found.</p> : null}
           </div>
         </section>
       )}

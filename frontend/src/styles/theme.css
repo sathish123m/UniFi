@@ -1980,7 +1980,6 @@ button.portal-row {
 }
 
 [data-theme='light'] .portal-user-card,
-[data-theme='light'] .portal-nav-item,
 [data-theme='light'] .portal-panel-card,
 [data-theme='light'] .portal-section,
 [data-theme='light'] .portal-row,
@@ -1988,6 +1987,12 @@ button.portal-row {
 [data-theme='light'] .portal-info-grid > div,
 [data-theme='light'] .portal-alert-card,
 [data-theme='light'] .portal-motion {
+  border-color: rgba(17, 24, 39, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme='light'] .portal-nav-item {
+  color: #1e293b;
   border-color: rgba(17, 24, 39, 0.14);
   background: rgba(255, 255, 255, 0.92);
 }
@@ -2012,7 +2017,9 @@ button.portal-row {
 }
 
 [data-theme='light'] .portal-motion-track span {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(241, 245, 249, 0.95);
+  color: #1e293b;
+  border: 1px solid rgba(17, 24, 39, 0.12);
 }
 
 [data-theme='light'] .portal-noise {
@@ -2023,7 +2030,7 @@ button.portal-row {
 [data-theme='light'] .portal-stat-card span,
 [data-theme='light'] .portal-info-grid span,
 [data-theme='light'] .portal-alert-card small {
-  color: #5b6685;
+  color: #475569;
 }
 
 [data-theme='light'] .portal-chip {
@@ -2034,5 +2041,7 @@ button.portal-row {
 
 [data-theme='light'] .portal-nav-item.active,
 [data-theme='light'] .portal-nav-item:hover {
-  color: #121724;
+  color: #0f172a;
+  background: rgba(201, 168, 76, 0.18);
+  border-color: rgba(201, 168, 76, 0.5);
 }

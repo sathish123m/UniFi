@@ -22,8 +22,14 @@ const portalLabel = (role) => {
 export default function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, register, verifyOtp, resendOtp, loading } = useAuth();
+  const { user, accessToken, login, register, verifyOtp, resendOtp, loading } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    if (user && accessToken) {
+      navigate("/portal", { replace: true });
+    }
+  }, [user, accessToken, navigate]);
 
   const [tab, setTab] = useState("login");
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });

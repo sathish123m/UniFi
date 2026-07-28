@@ -34,6 +34,25 @@ export const AuthProvider = ({ children }) => {
     writeStored({ accessToken, refreshToken, user })
   }, [accessToken, refreshToken, user])
 
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_KEY) {
+        const updated = readStored()
+        if (!updated) {
+          setAccessToken('')
+          setRefreshToken('')
+          setUser(null)
+        } else {
+          setAccessToken(updated.accessToken || '')
+          setRefreshToken(updated.refreshToken || '')
+          setUser(updated.user || null)
+        }
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
   const setSession = ({ accessToken: at, refreshToken: rt, user: u }) => {
     setAccessToken(at)
     setRefreshToken(rt)
