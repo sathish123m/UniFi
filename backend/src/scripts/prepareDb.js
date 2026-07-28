@@ -17,7 +17,17 @@ const shouldSeed = () => String(process.env.DB_SEED_ON_DEPLOY || 'true').toLower
 
 const main = () => {
   if (hasMigrationDirs()) {
-    run('npx prisma migrate deploy')
+    try {
+      run('npx prisma migrate deploy')
+    } catch (e) {
+      console.warn('[db-prepare] migrate deploy failed (e.g. existing production DB); falling back to migrate resolve & db push')
+      try {
+        run('npx prisma migrate resolve --applied 20260727000000_init')
+        run('npx prisma migrate deploy')
+      } catch (resolveErr) {
+        run('npx prisma db push')
+      }
+    }
   } else {
     console.log('[db-prepare] No migrations found -> running prisma db push')
     run('npx prisma db push')
