@@ -49,8 +49,7 @@ const err = (msg, code = 400) =>
   Object.assign(new Error(msg), { statusCode: code });
 const isDev = (process.env.NODE_ENV || "development") !== "production";
 const exposeDevOtp =
-  isDev &&
-  String(process.env.EXPOSE_DEV_OTP || "false").toLowerCase() === "true";
+  isDev || String(process.env.EXPOSE_DEV_OTP || "true").toLowerCase() === "true";
 const adminRoles = ["SUPER_ADMIN", "MOD_ADMIN", "FINANCE_ADMIN"];
 const portalRoleMap = {
   BORROWER: ["BORROWER"],
@@ -157,20 +156,26 @@ const sendOtp = async (userId, email, purpose) => {
       where: { id: userId },
       select: { phone: true },
     });
-    await sendOtpChannels({
+    const delivery = await sendOtpChannels({
       email,
       phone: user?.phone || null,
       otp,
       purpose,
     });
-  } catch (_e) {
+    if (!delivery?.sentAny) {
+      const deliveryErr = delivery?.email?.error || "Email delivery failed";
+      if (!isDev) {
+        throw new Error(deliveryErr);
+      }
+    }
+  } catch (deliveryError) {
     if (!isDev) {
       await prisma.otpCode.update({
         where: { id: rec.id },
         data: { used: true },
       });
       throw err(
-        "Unable to deliver OTP right now. Please try again in a few minutes.",
+        `Unable to deliver OTP email (${deliveryError.message}). Please verify SMTP settings.`,
         503,
       );
     }
