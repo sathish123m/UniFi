@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5050/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://unifi-backend-u99t.onrender.com/api'
 
 const parseBody = async (res) => {
   const text = await res.text()

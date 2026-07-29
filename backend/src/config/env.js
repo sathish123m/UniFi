@@ -100,10 +100,18 @@ const validateEnv = () => {
 
 const corsOrigins = () => {
   const fromEnv = process.env.CORS_ORIGINS
+  const defaults = [
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'https://unifine.vercel.app',
+    'https://unifi.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ]
   if (fromEnv && fromEnv.trim()) {
-    return fromEnv.split(',').map((v) => v.trim()).filter(Boolean)
+    const parsed = fromEnv.split(',').map((v) => v.trim()).filter(Boolean)
+    return Array.from(new Set([...parsed, ...defaults]))
   }
-  return [process.env.FRONTEND_URL || 'http://localhost:5173']
+  return defaults
 }
 
 const paymentProvider = () => (process.env.PAYMENT_PROVIDER || 'MOCK').toUpperCase()
