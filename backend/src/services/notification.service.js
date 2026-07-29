@@ -43,19 +43,23 @@ if (
 
 const smtpHost = process.env.SMTP_HOST || 'smtp.mailtrap.io'
 
-const createTransporter = ({ host, port, secure, requireTLS }) => nodemailer.createTransport({
-  host,
-  port,
-  secure,
-  connectionTimeout: smtpConnectionTimeoutMs,
-  greetingTimeout: smtpGreetingTimeoutMs,
-  socketTimeout: smtpSocketTimeoutMs,
-  requireTLS,
-  tls: {
-    rejectUnauthorized: String(process.env.SMTP_ALLOW_SELF_SIGNED || 'false').toLowerCase() !== 'true',
-  },
-  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-})
+const createTransporter = ({ host, port, secure, requireTLS }) => {
+  const cleanUser = String(process.env.SMTP_USER || '').trim()
+  const cleanPass = String(process.env.SMTP_PASS || '').replace(/\s+/g, '')
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    connectionTimeout: smtpConnectionTimeoutMs,
+    greetingTimeout: smtpGreetingTimeoutMs,
+    socketTimeout: smtpSocketTimeoutMs,
+    requireTLS,
+    tls: {
+      rejectUnauthorized: String(process.env.SMTP_ALLOW_SELF_SIGNED || 'false').toLowerCase() !== 'true',
+    },
+    auth: { user: cleanUser, pass: cleanPass },
+  })
+}
 
 const primaryRequireTLS = String(process.env.SMTP_REQUIRE_TLS || 'true').toLowerCase() === 'true'
 const smtpCandidates = () => {
@@ -291,7 +295,7 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
           html,
         })
         logger.info(
-          `OTP sent to ${email} via Brevo API (messageId=${info.messageId || 'n/a'}, response=${info.response})`
+          `OTP sent to ${email} via Brevo API fallback (messageId=${info.messageId || 'n/a'}, response=${info.response})`
         )
         return {
           sent: true,
@@ -302,9 +306,28 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
         }
       } catch (brevoError) {
         logger.warn(`Email Brevo fallback failed (${email}): ${brevoError.message}`)
-        if (strict) throw brevoError
-        if (process.env.NODE_ENV === 'development') logger.info(`DEV OTP for ${email}: ${otp}`)
-        return { sent: false, channel: 'email', error: brevoError.message }
+      }
+    }
+    if (mailjetApiEnabled) {
+      try {
+        const info = await sendMailViaMailjetApi({
+          to: email,
+          subject,
+          text,
+          html,
+        })
+        logger.info(
+          `OTP sent to ${email} via Mailjet API fallback (messageId=${info.messageId || 'n/a'}, response=${info.response})`
+        )
+        return {
+          sent: true,
+          channel: 'email',
+          provider: 'MAILJET_API',
+          response: info.response,
+          messageId: info.messageId,
+        }
+      } catch (mjError) {
+        logger.warn(`Email Mailjet fallback failed (${email}): ${mjError.message}`)
       }
     }
     if (strict) throw smtpError
