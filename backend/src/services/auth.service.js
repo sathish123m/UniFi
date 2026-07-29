@@ -204,7 +204,7 @@ const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
   const recs = await prisma.otpCode.findMany({
     where: {
       userId: { in: users.map((u) => u.id) },
-      purpose,
+      ...(purpose ? { purpose } : {}),
       used: false,
       expiresAt: { gt: new Date() },
     },
@@ -234,14 +234,14 @@ const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
     }
   }
 
-  if (!matched) throw err("Invalid OTP");
+  if (!matched) throw err("Invalid or expired OTP", 400);
 
   await prisma.otpCode.update({
     where: { id: matched.id },
     data: { used: true },
   });
 
-  if (purpose === "EMAIL_VERIFY") {
+  if (matched.purpose === "EMAIL_VERIFY" || purpose === "EMAIL_VERIFY") {
     await prisma.user.update({
       where: { id: matched.user.id },
       data: { emailVerified: true },
