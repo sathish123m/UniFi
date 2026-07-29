@@ -231,7 +231,9 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
   `
 
   try {
-    if (emailProvider === 'MAILJET_API') {
+    const isGmailSender = /@gmail\.com$/i.test(smtpFromEmail)
+
+    if (emailProvider === 'MAILJET_API' && !isGmailSender) {
       const info = await sendMailViaMailjetApi({
         to: email,
         subject,
