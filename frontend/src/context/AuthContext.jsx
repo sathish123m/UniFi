@@ -141,6 +141,24 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const forgotPassword = async (payload) => {
+    setLoading(true)
+    try {
+      return await api.post('/auth/forgot-password', payload)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetPassword = async (payload) => {
+    setLoading(true)
+    try {
+      return await api.post('/auth/reset-password', payload)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const value = useMemo(
     () => ({
       user,
@@ -155,6 +173,8 @@ export const AuthProvider = ({ children }) => {
       me,
       refresh,
       clearSession,
+      forgotPassword,
+      resetPassword,
     }),
     [user, accessToken, refreshToken, loading]
   )

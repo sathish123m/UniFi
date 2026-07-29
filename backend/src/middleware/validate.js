@@ -60,6 +60,7 @@ const loginSchema = z.object({
     email: z.string().trim().email(),
     password: z.string().min(1),
     requestedRole: z.enum(["BORROWER", "PROVIDER", "ADMIN"]).optional(),
+    twoFaCode: z.string().length(6).regex(/^\d+$/, "2FA code must be 6 digits").optional(),
   }),
 });
 
@@ -67,7 +68,7 @@ const verifyOtpSchema = z.object({
   body: z.object({
     email: z.string().trim().email(),
     otp: z.string().length(6).regex(/^\d+$/, "OTP must be numeric"),
-    purpose: z.enum(["EMAIL_VERIFY", "LOGIN", "UPI_VERIFY"]),
+    purpose: z.enum(["EMAIL_VERIFY", "LOGIN", "UPI_VERIFY", "ADMIN_2FA", "PASSWORD_RESET"]),
     requestedRole: z.enum(["BORROWER", "PROVIDER", "ADMIN"]).optional(),
   }),
 });

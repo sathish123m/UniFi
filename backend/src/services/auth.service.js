@@ -140,11 +140,8 @@ const register = async ({
 };
 
 const sendOtp = async (userId, email, purpose) => {
-  await prisma.otpCode.updateMany({
-    where: { userId, purpose, used: false },
-    data: { used: true },
-  });
   const otp = generateOtp();
+
   const rec = await prisma.otpCode.create({
     data: {
       id: createId(),
@@ -160,22 +157,23 @@ const sendOtp = async (userId, email, purpose) => {
       where: { id: userId },
       select: { phone: true },
     });
-    const delivery = await sendOtpChannels({
+    await sendOtpChannels({
       email,
       phone: user?.phone || null,
       otp,
       purpose,
     });
-    if (!delivery.sentAny) throw new Error("All OTP channels failed");
   } catch (_e) {
-    await prisma.otpCode.update({
-      where: { id: rec.id },
-      data: { used: true },
-    });
-    throw err(
-      "Unable to deliver OTP right now. Please try again in a few minutes.",
-      503,
-    );
+    if (!isDev) {
+      await prisma.otpCode.update({
+        where: { id: rec.id },
+        data: { used: true },
+      });
+      throw err(
+        "Unable to deliver OTP right now. Please try again in a few minutes.",
+        503,
+      );
+    }
   }
 
   return otp;
@@ -254,7 +252,7 @@ const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
   return issueTokens(matched.user);
 };
 
-const login = async ({ email, password, requestedRole }, reqInfo = {}) => {
+const login = async ({ email, password, requestedRole, twoFaCode }, reqInfo = {}) => {
   const normalizedEmail = normalizeEmail(email);
   const requested = normalizeRequestedRole(requestedRole);
   const accounts = await prisma.user.findMany({
@@ -264,64 +262,87 @@ const login = async ({ email, password, requestedRole }, reqInfo = {}) => {
 
   if (!accounts.length) throw err("Invalid credentials", 401);
 
+  let targetUser = null;
+
   if (!requested) {
-    let matched = null;
     for (const account of accounts) {
       if (await bcrypt.compare(password, account.passwordHash)) {
-        matched = account;
+        targetUser = account;
         break;
       }
     }
-    if (!matched) throw err("Invalid credentials", 401);
+    if (!targetUser) throw err("Invalid credentials", 401);
+  } else {
+    const allowedRoles = portalRoleMap[requested];
+    const candidates = accounts.filter((account) =>
+      allowedRoles.includes(account.role),
+    );
+    if (!candidates.length) throw err(roleAccessError(requested), 403);
 
-    if (!matched.emailVerified)
-      throw err("Please verify your email first", 403);
-    if (matched.isBanned) throw err("Account banned", 403);
-    if (matched.isSuspended) throw err("Account suspended", 403);
-
-    await prisma.user.update({
-      where: { id: matched.id },
-      data: { lastLoginAt: new Date() },
-    });
-    await recordDeviceSession(matched.id, reqInfo);
-    return issueTokens(matched);
-  }
-
-  const allowedRoles = portalRoleMap[requested];
-  const candidates = accounts.filter((account) =>
-    allowedRoles.includes(account.role),
-  );
-  if (!candidates.length) throw err(roleAccessError(requested), 403);
-
-  let matchCandidate = null;
-  for (const candidate of candidates) {
-    if (await bcrypt.compare(password, candidate.passwordHash)) {
-      matchCandidate = candidate;
-      break;
-    }
-  }
-
-  if (!matchCandidate) {
-    for (const account of accounts) {
-      if (allowedRoles.includes(account.role)) continue;
-      if (await bcrypt.compare(password, account.passwordHash)) {
-        throw err(roleAccessError(requested), 403);
+    for (const candidate of candidates) {
+      if (await bcrypt.compare(password, candidate.passwordHash)) {
+        targetUser = candidate;
+        break;
       }
     }
-    throw err("Invalid credentials", 401);
+
+    if (!targetUser) {
+      for (const account of accounts) {
+        if (allowedRoles.includes(account.role)) continue;
+        if (await bcrypt.compare(password, account.passwordHash)) {
+          throw err(roleAccessError(requested), 403);
+        }
+      }
+      throw err("Invalid credentials", 401);
+    }
   }
 
-  if (!matchCandidate.emailVerified)
+  if (!targetUser.emailVerified)
     throw err("Please verify your email first", 403);
-  if (matchCandidate.isBanned) throw err("Account banned", 403);
-  if (matchCandidate.isSuspended) throw err("Account suspended", 403);
+  if (targetUser.isBanned) throw err("Account banned", 403);
+  if (targetUser.isSuspended) throw err("Account suspended", 403);
+
+  // Admin 2FA Verification Flow
+  const isAdmin = adminRoles.includes(targetUser.role) || requested === "ADMIN";
+  if (isAdmin) {
+    if (!twoFaCode) {
+      const otp = await sendOtp(targetUser.id, targetUser.email, "ADMIN_2FA");
+      return {
+        requires2FA: true,
+        email: targetUser.email,
+        message: "2FA authentication code sent to admin email.",
+        ...(exposeDevOtp && { devOtp: otp }),
+      };
+    }
+
+    // Verify provided 2FA code
+    const otpRecord = await prisma.otpCode.findFirst({
+      where: {
+        userId: targetUser.id,
+        purpose: "ADMIN_2FA",
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!otpRecord) throw err("Invalid or expired 2FA verification code", 400);
+
+    const isValid = await verifyOtp(twoFaCode, otpRecord.code);
+    if (!isValid) throw err("Invalid 2FA verification code", 400);
+
+    await prisma.otpCode.update({
+      where: { id: otpRecord.id },
+      data: { used: true },
+    });
+  }
 
   await prisma.user.update({
-    where: { id: matchCandidate.id },
+    where: { id: targetUser.id },
     data: { lastLoginAt: new Date() },
   });
-  await recordDeviceSession(matchCandidate.id, reqInfo);
-  return issueTokens(matchCandidate);
+  await recordDeviceSession(targetUser.id, reqInfo);
+  return issueTokens(targetUser);
 };
 
 const issueTokens = async (user) => {
