@@ -79,18 +79,18 @@ const smtpCandidates = () => {
   const gmailHost = /smtp\.gmail\.com/i.test(String(smtpHost || ''))
   if (gmailHost) {
     push({
-      name: 'gmail-starttls',
-      host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
-      requireTLS: true,
-    })
-    push({
       name: 'gmail-ssl',
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
       requireTLS: false,
+    })
+    push({
+      name: 'gmail-starttls',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
     })
   }
 
