@@ -57,7 +57,7 @@ const createTransporter = ({ host, port, secure, requireTLS }) => nodemailer.cre
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
 })
 
-const primaryRequireTLS = String(process.env.SMTP_REQUIRE_TLS || 'false').toLowerCase() === 'true'
+const primaryRequireTLS = String(process.env.SMTP_REQUIRE_TLS || 'true').toLowerCase() === 'true'
 const smtpCandidates = () => {
   const unique = new Set()
   const result = []
@@ -68,15 +68,17 @@ const smtpCandidates = () => {
     result.push(cfg)
   }
 
+  const gmailHost = /smtp\.gmail\.com/i.test(String(smtpHost || ''))
+  const requireTLS = gmailHost && !smtpSecure ? true : primaryRequireTLS
+
   push({
     name: 'primary',
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
-    requireTLS: primaryRequireTLS,
+    requireTLS,
   })
 
-  const gmailHost = /smtp\.gmail\.com/i.test(String(smtpHost || ''))
   if (gmailHost) {
     push({
       name: 'gmail-ssl',
