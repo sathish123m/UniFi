@@ -154,7 +154,8 @@ export default function AuthPage() {
       });
       setMessage("Password reset OTP sent to your email.");
       setForgotForm((p) => ({ ...p, step: 2 }));
-      if (response?.data?.devOtp) setDevOtp(response.data.devOtp);
+      const devCode = response?.devOtp || response?.data?.devOtp;
+      if (devCode) setDevOtp(devCode);
     } catch (err) {
       setError(parseError(err));
     }
@@ -222,7 +223,8 @@ export default function AuthPage() {
       setMessage(
         "Registration created. Check Inbox/Spam/Quarantine for OTP, then verify.",
       );
-      if (response?.data?.devOtp) setDevOtp(response.data.devOtp);
+      const devCode = response?.devOtp || response?.data?.devOtp;
+      if (devCode) setDevOtp(devCode);
     } catch (err) {
       setError(parseError(err));
     }
@@ -257,7 +259,8 @@ export default function AuthPage() {
         otpForm.requestedRole || loginPortal || undefined,
       );
       setMessage("OTP sent again. Check Inbox/Spam/Quarantine.");
-      if (response?.data?.devOtp) setDevOtp(response.data.devOtp);
+      const devCode = response?.devOtp || response?.data?.devOtp;
+      if (devCode) setDevOtp(devCode);
     } catch (err) {
       setError(parseError(err));
     }
