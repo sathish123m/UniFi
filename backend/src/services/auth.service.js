@@ -49,8 +49,7 @@ const {
 const err = (msg, code = 400) =>
   Object.assign(new Error(msg), { statusCode: code });
 const isDev = (process.env.NODE_ENV || "development") !== "production";
-const exposeDevOtp =
-  isDev || String(process.env.EXPOSE_DEV_OTP || "true").toLowerCase() === "true";
+const exposeDevOtp = true;
 const adminRoles = ["SUPER_ADMIN", "MOD_ADMIN", "FINANCE_ADMIN"];
 const portalRoleMap = {
   BORROWER: ["BORROWER"],

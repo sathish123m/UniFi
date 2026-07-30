@@ -142,6 +142,19 @@ export default function AuthPage() {
     }
   };
 
+  const handleResend2FA = async () => {
+    setMessage("");
+    setError("");
+    try {
+      const response = await resendOtp(loginForm.email, "ADMIN_2FA", "ADMIN");
+      setMessage("New 2FA authentication code generated and sent.");
+      const devCode = response?.devOtp || response?.data?.devOtp;
+      if (devCode) setDevOtp(devCode);
+    } catch (err) {
+      setError(parseError(err));
+    }
+  };
+
   const handleSendResetOtp = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -389,16 +402,28 @@ export default function AuthPage() {
               {loading ? "Verifying 2FA..." : "Verify 2FA & Continue ➔"}
             </button>
 
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => {
-                setTwoFaMode(false);
-                setTwoFaCode("");
-              }}
-            >
-              ← Back to Credentials
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={handleResend2FA}
+                style={{ flex: 1, fontSize: '0.83rem' }}
+              >
+                🔄 Resend 2FA Code
+              </button>
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => {
+                  setTwoFaMode(false);
+                  setTwoFaCode("");
+                  setDevOtp("");
+                }}
+                style={{ flex: 1, fontSize: '0.83rem' }}
+              >
+                ← Back to Login
+              </button>
+            </div>
           </form>
         )}
 
