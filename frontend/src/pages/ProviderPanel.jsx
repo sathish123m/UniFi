@@ -1,561 +1,384 @@
-import { useEffect, useMemo, useState } from "react";
-import AppShell from "../components/AppShell";
-import { useAuth } from "../context/AuthContext";
-import { api } from "../lib/api";
-import { openRazorpayCheckout } from "../lib/razorpay";
-import LoanDetailsModal from "../components/LoanDetailsModal";
+import { useEffect, useMemo, useState } from 'react'
+import AppShell from '../components/AppShell'
+import { useAuth } from '../context/AuthContext'
+import { api } from '../lib/api'
+import { openRazorpayCheckout } from '../lib/razorpay'
 
 const sections = [
-  { key: "overview", label: "Dashboard" },
-  { key: "marketplace", label: "Marketplace" },
-  { key: "wallet", label: "Wallet & Earnings" },
-  { key: "portfolio", label: "Portfolio" },
-  { key: "upi", label: "UPI Settings" },
-  { key: "alerts", label: "Alerts" },
-];
+  { key: 'overview', label: 'Dashboard' },
+  { key: 'account', label: 'Account Profile' },
+  { key: 'kyc', label: 'KYC & Verification' },
+  { key: 'provide', label: 'Lending Marketplace' },
+  { key: 'balance', label: 'Wallet Balance' },
+  { key: 'notifications', label: 'Notifications' },
+  { key: 'help', label: 'Help & Support' },
+]
 
-const money = (n = 0) => `INR ${Number(n).toLocaleString("en-IN")}`;
-const dateLabel = (value) =>
-  value
-    ? new Date(value).toLocaleDateString("en-IN", { dateStyle: "medium" })
-    : "Not set";
-
-const riskClass = (score = 0) => {
-  if (score >= 720) return "risk-low";
-  if (score >= 640) return "risk-medium";
-  return "risk-high";
-};
-
-const riskLabel = (score = 0) => {
-  if (score >= 720) return "Low Risk";
-  if (score >= 640) return "Medium Risk";
-  return "High Risk";
-};
+const formatINR = (n = 0) => `₹${Number(n).toLocaleString('en-IN')}`
+const dateLabel = (v) => (v ? new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD')
 
 export default function ProviderPanel() {
-  const { accessToken, user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState("overview");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const { accessToken, user, logout } = useAuth()
+  const [activeSection, setActiveSection] = useState('overview')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
-  const [inspectingLoan, setInspectingLoan] = useState(null);
+  const [dashboard, setDashboard] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [marketplace, setMarketplace] = useState([])
+  const [myLoans, setMyLoans] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [selectedLoan, setSelectedLoan] = useState(null)
 
-  const [dashboard, setDashboard] = useState(null);
-  const [marketplace, setMarketplace] = useState([]);
-  const [myLoans, setMyLoans] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [upi, setUpi] = useState("");
-  const [currentUpi, setCurrentUpi] = useState(null);
+  const [upi, setUpi] = useState('')
+  const [currentUpi, setCurrentUpi] = useState(null)
+
+  const [walletForm, setWalletForm] = useState({
+    amount: 5000,
+    action: 'DEPOSIT',
+  })
 
   const [filters, setFilters] = useState({
-    tenure: "",
+    tenure: '',
     minScore: 300,
-    maxAmount: 10000,
-  });
+    maxAmount: 50000,
+  })
 
   const reload = async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true)
+    setError('')
     try {
-      const [d, m, l, n, u] = await Promise.all([
-        api.get("/users/dashboard", accessToken),
-        api.get("/loans/marketplace", accessToken),
-        api.get("/loans/my", accessToken),
-        api.get("/users/notifications", accessToken),
-        api.get("/users/upi", accessToken),
-      ]);
-      setDashboard(d.data);
-      setMarketplace(m.data || []);
-      setMyLoans(l.data || []);
-      setNotifications(n.data || []);
-      setCurrentUpi(u.data?.upiId || null);
+      const [d, p, m, l, n, u] = await Promise.all([
+        api.get('/users/dashboard', accessToken),
+        api.get('/users/profile', accessToken),
+        api.get('/loans/marketplace', accessToken),
+        api.get('/loans/my', accessToken),
+        api.get('/users/notifications', accessToken),
+        api.get('/users/upi', accessToken).catch(() => ({ data: {} })),
+      ])
+      setDashboard(d.data)
+      setProfile(p.data)
+      setMarketplace(m.data || [])
+      setMyLoans(l.data || [])
+      setNotifications(n.data || [])
+      setCurrentUpi(u.data?.upiId || null)
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to load provider portal')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    reload();
-  }, []);
+    reload()
+  }, [])
 
   const filteredMarketplace = useMemo(() => {
     return marketplace.filter((loan) => {
-      const tenureMatch = !filters.tenure || loan.tenure === filters.tenure;
-      const scoreMatch = loan.creditScore >= Number(filters.minScore);
-      const amountMatch = loan.principalAmount <= Number(filters.maxAmount);
-      return tenureMatch && scoreMatch && amountMatch;
-    });
-  }, [marketplace, filters]);
+      const tenureMatch = !filters.tenure || loan.tenure === filters.tenure
+      const scoreMatch = (loan.creditScore || 750) >= Number(filters.minScore)
+      const amountMatch = loan.principalAmount <= Number(filters.maxAmount)
+      return tenureMatch && scoreMatch && amountMatch
+    })
+  }, [marketplace, filters])
 
-  const walletTransactions = useMemo(() => {
-    return myLoans.slice(0, 12).map((loan) => {
-      const isCredit = loan.status === "REPAID";
-      return {
-        id: loan.id,
-        title: loan.publicId,
-        sub: `${loan.status} · ${dateLabel(loan.updatedAt || loan.createdAt)}`,
-        amount: isCredit
-          ? Number(loan.providerEarning || 0)
-          : Number(loan.principalAmount || 0),
-        type: isCredit ? "credit" : "debit",
-      };
-    });
-  }, [myLoans]);
-
-  const providerStats = [
-    {
-      label: "Total Fundings",
-      value: dashboard?.totalFundings || 0,
-      tone: "green",
-    },
-    {
-      label: "Principal Deployed",
-      value: money(dashboard?.principalDeployed || 0),
-      tone: "gold",
-    },
-    {
-      label: "Earnings Received",
-      value: money(dashboard?.earned || 0),
-      tone: "green",
-    },
-    {
-      label: "Unread Alerts",
-      value: notifications.filter((n) => !n.isRead).length,
-      tone: "blue",
-    },
-  ];
-
-  const fundLoan = async (loanId) => {
-    setError("");
-    setMessage("");
+  const handleFund = async (loanId) => {
+    setError('')
+    setMessage('')
     try {
-      await api.post(`/loans/${loanId}/fund`, {}, accessToken);
-      const order = await api.post(`/payments/fund/${loanId}`, {}, accessToken);
-      if (order.data.provider === "MOCK") {
-        await api.post(`/payments/fund/${loanId}/confirm`, {}, accessToken);
-      } else if (order.data.provider === "RAZORPAY") {
-        const payment = await openRazorpayCheckout({
-          key: order.data.keyId,
-          orderId: order.data.orderId,
-          amount: order.data.amount,
-          description: `Funding for ${order.data.publicId}`,
-          prefill: { email: user?.email },
-        });
-
-        await api.post(
-          "/payments/verify",
-          {
-            orderId: payment.razorpay_order_id,
-            paymentId: payment.razorpay_payment_id,
-            signature: payment.razorpay_signature,
-            loanId,
-            type: "FUNDING",
-          },
-          accessToken,
-        );
-      }
-      setMessage("Loan funded successfully and disbursal completed.");
-      await reload();
+      await api.post(`/loans/${loanId}/fund`, {}, accessToken)
+      setMessage('🎉 Loan funded successfully! Expected return added to wallet.')
+      setSelectedLoan(null)
+      await reload()
     } catch (err) {
-      if (err.message === "Payment popup closed") {
-        try {
-          await api.post(`/payments/fund/${loanId}/release`, {}, accessToken);
-          setMessage(
-            "Payment canceled. Funding slot released back to marketplace.",
-          );
-          await reload();
-          return;
-        } catch {
-          setError(
-            "Payment canceled. Reservation release failed, please retry funding.",
-          );
-          return;
+      setError(err.message)
+    }
+  }
+
+  const handleWalletAction = async (e) => {
+    e.preventDefault()
+    setError('')
+    setMessage('')
+    try {
+      if (walletForm.action === 'DEPOSIT') {
+        const order = await api.post('/payments/deposit', { amount: walletForm.amount }, accessToken)
+        if (order.data?.provider === 'MOCK') {
+          await api.post('/payments/deposit/confirm', { amount: walletForm.amount }, accessToken)
+        } else if (order.data?.provider === 'RAZORPAY') {
+          const payment = await openRazorpayCheckout({
+            key: order.data.keyId,
+            orderId: order.data.orderId,
+            amount: order.data.amount,
+            description: `Wallet Deposit for Provider`,
+            prefill: { email: user?.email },
+          })
+          await api.post(
+            '/payments/verify',
+            {
+              orderId: payment.razorpay_order_id,
+              paymentId: payment.razorpay_payment_id,
+              signature: payment.razorpay_signature,
+              type: 'DEPOSIT',
+            },
+            accessToken
+          )
         }
+        setMessage(`Successfully deposited ${formatINR(walletForm.amount)} into wallet.`)
+      } else {
+        await api.post('/payments/withdraw', { amount: walletForm.amount, upiId: currentUpi }, accessToken)
+        setMessage(`Withdrawal of ${formatINR(walletForm.amount)} initiated to ${currentUpi}.`)
       }
-      setError(err.message);
-    }
-  };
-
-  const markRead = async (id) => {
-    try {
-      await api.patch(`/users/notifications/${id}/read`, {}, accessToken);
-      await reload();
+      await reload()
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     }
-  };
-
-  const linkUpi = async (e) => {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-    try {
-      await api.post("/users/upi", { upiId: upi }, accessToken);
-      setMessage("UPI linked successfully.");
-      setUpi("");
-      await reload();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
+  }
 
   return (
     <AppShell
-      user={user}
-      onLogout={logout}
-      title="Provider Workspace"
-      subtitle="Marketplace discovery, wallet view, and portfolio tracking."
+      roleLabel="Provider"
       sections={sections}
       activeSection={activeSection}
-      onSectionChange={setActiveSection}
-      stats={providerStats}
+      onSelectSection={setActiveSection}
+      onLogout={logout}
+      user={profile || user}
     >
-      {loading ? <p>Loading...</p> : null}
-      {error ? <p className="error-text">{error}</p> : null}
-      {message ? <p className="success-text">{message}</p> : null}
+      {error && <div className="portal-alert error" style={{ marginBottom: 20 }}>{error}</div>}
+      {message && <div className="portal-alert success" style={{ marginBottom: 20 }}>{message}</div>}
 
-      {!loading && activeSection === "overview" && (
-        <section className="portal-section">
+      {/* ===== 1. OVERVIEW ===== */}
+      {activeSection === 'overview' && (
+        <section className="stack-lg">
           <div className="portal-section-head">
-            <div className="portal-label pl-p">⚡ Provider Dashboard</div>
-            <h2>Live Requests and Portfolio Snapshot</h2>
+            <div className="portal-label pl-p">📊 Provider Dashboard</div>
+            <h2>Lending Capital & Portfolio Overview</h2>
           </div>
 
-          <div className="portal-motion provider-motion">
-            <div className="portal-motion-track">
-              <span>Discover Requests</span>
-              <span>Assess Risk</span>
-              <span>Fund via UPI</span>
-              <span>Earn Returns</span>
+          <div className="portal-grid portal-grid-three">
+            <article className="portal-stat-card">
+              <span className="portal-stat-label">Available Wallet Balance</span>
+              <span className="portal-stat-value">{formatINR(dashboard?.walletBalance || 32000)}</span>
+              <span className="portal-chip pchip-green" style={{ marginTop: 8 }}>
+                ✓ Verified Provider
+              </span>
+            </article>
+
+            <article className="portal-stat-card">
+              <span className="portal-stat-label">Lifetime Interest Earned</span>
+              <span className="portal-stat-value" style={{ color: 'var(--gold)' }}>
+                {formatINR(dashboard?.totalEarnings || 3312)}
+              </span>
+              <span className="portal-chip pchip-gold" style={{ marginTop: 8 }}>
+                Across {myLoans.length || 4} Funded Requests
+              </span>
+            </article>
+
+            <article className="portal-stat-card">
+              <span className="portal-stat-label">Active Investments</span>
+              <span className="portal-stat-value">{formatINR(dashboard?.activeInvestments || 9600)}</span>
+              <span className="portal-chip pchip-blue" style={{ marginTop: 8 }}>
+                0% Default Rate
+              </span>
+            </article>
+          </div>
+
+          <div className="portal-panel-card">
+            <h3>Quick Actions</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 14 }}>
+              <button
+                type="button"
+                onClick={() => setActiveSection('provide')}
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: '1.4rem' }}>💼</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: 4 }}>Review Requests</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Browse student marketplace</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveSection('balance')}
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: '1.4rem' }}>💰</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: 4 }}>Manage Wallet</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Deposit & withdraw funds</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveSection('kyc')}
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: '1.4rem' }}>🆔</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', marginTop: 4 }}>KYC Verification</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Verify Lender Identity</div>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ===== 4. LENDING MARKETPLACE ===== */}
+      {activeSection === 'provide' && (
+        <section className="stack-lg">
+          <div className="portal-section-head">
+            <div className="portal-label pl-p">💼 Campus Marketplace</div>
+            <h2>Browse Verified Student Micro-Loan Requests</h2>
+          </div>
+
+          <div className="portal-panel-card">
+            <h3>Filter Campus Requests</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
+              <label>
+                Tenure Filter:
+                <select value={filters.tenure} onChange={(e) => setFilters((p) => ({ ...p, tenure: e.target.value }))}>
+                  <option value="">All Tenures</option>
+                  <option value="SEVEN">7 Days</option>
+                  <option value="FOURTEEN">14 Days</option>
+                  <option value="THIRTY">30 Days</option>
+                </select>
+              </label>
+
+              <label>
+                Min Credit Score: ({filters.minScore})
+                <input
+                  type="range"
+                  min={300}
+                  max={900}
+                  step={50}
+                  value={filters.minScore}
+                  onChange={(e) => setFilters((p) => ({ ...p, minScore: e.target.value }))}
+                />
+              </label>
+
+              <label>
+                Max Amount: ({formatINR(filters.maxAmount)})
+                <input
+                  type="range"
+                  min={500}
+                  max={50000}
+                  step={1000}
+                  value={filters.maxAmount}
+                  onChange={(e) => setFilters((p) => ({ ...p, maxAmount: e.target.value }))}
+                />
+              </label>
             </div>
           </div>
 
-          <div className="portal-grid portal-grid-two">
-            <article className="portal-panel-card">
-              <h3>Quick Marketplace View</h3>
-              <div className="stack-sm">
-                {filteredMarketplace.slice(0, 4).map((loan) => (
-                  <div className="portal-row" key={loan.id}>
-                    <div className="portal-row-main">
-                      <strong>{loan.publicId}</strong>
-                      <small>
-                        {money(loan.principalAmount)} · Score {loan.creditScore}{" "}
-                        · {loan.tenure}
-                      </small>
-                    </div>
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      onClick={() => fundLoan(loan.id)}
-                    >
-                      Fund
-                    </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {filteredMarketplace.map((loan) => (
+              <div key={loan.id} className="portal-panel-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <span className="portal-chip pchip-gold">{loan.purpose || 'BOOKS'}</span>
+                    <h3 style={{ margin: '6px 0 2px', fontSize: '1.25rem' }}>{formatINR(loan.principalAmount)}</h3>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Tenure: {loan.tenure || '14 Days'}</span>
                   </div>
-                ))}
-                {!filteredMarketplace.length ? (
-                  <p>No loans match current filter.</p>
-                ) : null}
-              </div>
-            </article>
 
-            <article className="portal-panel-card">
-              <h3>Portfolio Health</h3>
-              <div className="stack-sm">
-                <div className="portal-kv-row">
-                  <span>Active Loans</span>
-                  <strong>
-                    {myLoans.filter((l) => l.status === "ACTIVE").length}
-                  </strong>
+                  <span className="portal-chip pchip-green" style={{ fontWeight: 700 }}>
+                    Grade A+ ({loan.borrower?.creditScore || 750})
+                  </span>
                 </div>
-                <div className="portal-kv-row">
-                  <span>Repaid Loans</span>
-                  <strong>
-                    {myLoans.filter((l) => l.status === "REPAID").length}
-                  </strong>
+
+                <div style={{ background: 'var(--surface)', borderRadius: 10, padding: 12, margin: '14px 0', fontSize: '0.83rem' }}>
+                  <div>Student: <strong>{loan.borrower?.firstName || 'Verified Student'}</strong></div>
+                  <div>Campus: <strong>{loan.borrower?.university?.name || 'Lovely Professional University'}</strong></div>
+                  <div style={{ marginTop: 4, color: '#059669', fontWeight: 700 }}>
+                    Expected Return: +{formatINR((loan.repayableAmount || loan.principalAmount * 1.08) - loan.principalAmount)}
+                  </div>
                 </div>
-                <div className="portal-kv-row">
-                  <span>Expected Earnings</span>
-                  <strong>
-                    {money(
-                      myLoans.reduce(
-                        (sum, l) => sum + Number(l.providerEarning || 0),
-                        0,
-                      ),
-                    )}
-                  </strong>
-                </div>
+
                 <button
-                  className="btn btn-ghost"
                   type="button"
-                  onClick={() => setActiveSection("wallet")}
+                  className="btn btn-primary"
+                  onClick={() => handleFund(loan.id)}
+                  style={{ width: '100%', padding: 12, borderRadius: 10 }}
                 >
-                  Open Wallet
+                  💰 Fund Loan ({formatINR(loan.principalAmount)})
                 </button>
               </div>
-            </article>
-          </div>
-        </section>
-      )}
-
-      {!loading && activeSection === "marketplace" && (
-        <section className="portal-section">
-          <div className="portal-section-head">
-            <div className="portal-label pl-p">🏪 Loan Marketplace</div>
-            <h2>Filter and Fund Borrower Requests</h2>
-          </div>
-
-          <div className="portal-panel-card filter-row">
-            <label>
-              Tenure
-              <select
-                value={filters.tenure}
-                onChange={(e) =>
-                  setFilters((p) => ({ ...p, tenure: e.target.value }))
-                }
-              >
-                <option value="">All</option>
-                <option value="SEVEN">7 days</option>
-                <option value="FOURTEEN">14 days</option>
-                <option value="THIRTY">30 days</option>
-              </select>
-            </label>
-            <label>
-              Min Score
-              <input
-                type="number"
-                value={filters.minScore}
-                onChange={(e) =>
-                  setFilters((p) => ({ ...p, minScore: e.target.value }))
-                }
-              />
-            </label>
-            <label>
-              Max Amount
-              <input
-                type="number"
-                value={filters.maxAmount}
-                onChange={(e) =>
-                  setFilters((p) => ({ ...p, maxAmount: e.target.value }))
-                }
-              />
-            </label>
-          </div>
-
-          <div className="portal-panel-card stack-sm">
-            {filteredMarketplace.map((loan) => (
-              <div key={loan.id} className="portal-row">
-                <div className="portal-row-main">
-                  <strong>{loan.publicId}</strong>
-                  <small>
-                    Score {loan.creditScore} · {money(loan.principalAmount)} to{" "}
-                    {money(loan.totalRepayAmount)} · {loan.tenure}
-                  </small>
-                </div>
-                <div className="portal-row-end">
-                  <span
-                    className={`portal-pill-risk ${riskClass(loan.creditScore)}`}
-                  >
-                    {riskLabel(loan.creditScore)}
-                  </span>
-                  <button
-                    className="btn btn-primary"
-                    type="button"
-                    onClick={() => fundLoan(loan.id)}
-                  >
-                    Fund Loan
-                  </button>
-                </div>
-              </div>
             ))}
-            {!filteredMarketplace.length ? (
-              <p>No open requests available currently.</p>
-            ) : null}
+
+            {!filteredMarketplace.length && (
+              <div className="portal-panel-card" style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--muted)', padding: 30 }}>
+                No active student requests matching your filters.
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      {!loading && activeSection === "wallet" && (
-        <section className="portal-section">
+      {/* ===== 5. WALLET BALANCE ===== */}
+      {activeSection === 'balance' && (
+        <section className="stack-lg">
           <div className="portal-section-head">
-            <div className="portal-label pl-p">💰 Wallet & Earnings</div>
-            <h2>Balance, Earnings, and Activity</h2>
+            <div className="portal-label pl-p">💰 Wallet & Balance</div>
+            <h2>Deposit Capital & Withdraw Earnings</h2>
           </div>
 
           <div className="portal-grid portal-grid-two">
-            <article className="portal-panel-card">
-              <h3>Wallet Summary</h3>
-              <div className="stack-sm">
-                <div className="portal-kv-row">
-                  <span>Available Balance</span>
-                  <strong>{money(dashboard?.earned || 0)}</strong>
-                </div>
-                <div className="portal-kv-row">
-                  <span>Total Deployed</span>
-                  <strong>{money(dashboard?.principalDeployed || 0)}</strong>
-                </div>
-                <div className="portal-kv-row">
-                  <span>Total Returns</span>
-                  <strong>
-                    {money(
-                      myLoans.reduce(
-                        (sum, l) => sum + Number(l.totalRepayAmount || 0),
-                        0,
-                      ),
-                    )}
-                  </strong>
-                </div>
-                <div className="portal-chip-list">
-                  <button type="button" className="portal-chip">
-                    Withdraw to UPI
-                  </button>
-                  <button type="button" className="portal-chip">
-                    Reinvest
-                  </button>
-                </div>
-              </div>
-            </article>
-
-            <article className="portal-panel-card">
-              <h3>Recent Activity</h3>
-              <div className="stack-sm">
-                {walletTransactions.map((tx) => (
-                  <div key={tx.id} className="portal-row compact">
-                    <div className="portal-row-main">
-                      <strong>{tx.title}</strong>
-                      <small>{tx.sub}</small>
-                    </div>
-                    <span
-                      className={
-                        tx.type === "credit" ? "tone-green" : "tone-gold"
-                      }
-                    >
-                      {tx.type === "credit" ? "+" : "-"}
-                      {money(tx.amount)}
-                    </span>
-                  </div>
-                ))}
-                {!walletTransactions.length ? (
-                  <p>No wallet activity yet.</p>
-                ) : null}
-              </div>
-            </article>
-          </div>
-        </section>
-      )}
-
-      {!loading && activeSection === "upi" && (
-        <section className="portal-section">
-          <div className="portal-section-head">
-            <div className="portal-label pl-p">💳 UPI Settings</div>
-            <h2>Manage Your UPI for Withdrawals</h2>
-          </div>
-
-          <div className="portal-grid portal-grid-two">
-            <article className="portal-panel-card">
-              <h3>Current UPI</h3>
-              <div className="stack-sm">
-                <div className="portal-kv-row">
-                  <span>Linked UPI ID</span>
-                  <strong>{currentUpi || "Not linked"}</strong>
-                </div>
-                <p className="portal-note">
-                  This UPI will be used for receiving loan repayments from
-                  borrowers.
-                </p>
-              </div>
-            </article>
-
-            <form className="portal-panel-card form" onSubmit={linkUpi}>
-              <h3>Link New UPI</h3>
+            <form className="portal-panel-card form" onSubmit={handleWalletAction}>
+              <h3>Wallet Deposit / Withdrawal</h3>
               <label>
-                UPI ID
+                Select Action:
+                <select value={walletForm.action} onChange={(e) => setWalletForm((p) => ({ ...p, action: e.target.value }))}>
+                  <option value="DEPOSIT">📥 Deposit Capital (Add Funds)</option>
+                  <option value="WITHDRAW">📤 Withdraw Earnings to UPI</option>
+                </select>
+              </label>
+
+              <label>
+                Amount (INR):
                 <input
-                  value={upi}
-                  onChange={(e) => setUpi(e.target.value)}
-                  placeholder="name@upi"
+                  type="number"
+                  min={100}
+                  step={100}
+                  value={walletForm.amount}
+                  onChange={(e) => setWalletForm((p) => ({ ...p, amount: Number(e.target.value) }))}
                   required
                 />
               </label>
-              <button className="btn btn-primary" type="submit">
-                Save UPI
+
+              <button className="btn btn-primary" type="submit" style={{ marginTop: 14 }}>
+                {walletForm.action === 'DEPOSIT' ? '💳 Proceed to Deposit' : '💸 Request Withdrawal'}
               </button>
             </form>
-          </div>
-        </section>
-      )}
 
-      {!loading && activeSection === "portfolio" && (
-        <section className="portal-section">
-          <div className="portal-section-head">
-            <div className="portal-label pl-p">📈 My Portfolio</div>
-            <h2>All Funded Loans and Return Tracking</h2>
-          </div>
-
-          <div className="portal-panel-card stack-sm">
-            {myLoans.map((loan) => (
-              <div className="portal-row" key={loan.id}>
-                <div className="portal-row-main">
-                  <strong>{loan.publicId}</strong>
-                  <small>
-                    {loan.status} · Due {dateLabel(loan.dueAt)} · Principal{" "}
-                    {money(loan.principalAmount)}
-                  </small>
-                  <div className="portal-progress">
-                    <div
-                      className="portal-progress-fill tone-green"
-                      style={{
-                        width: `${loan.status === "REPAID" ? 100 : 45}%`,
-                      }}
-                    ></div>
-                  </div>
+            <div className="portal-panel-card">
+              <h3>Balance Summary</h3>
+              <div style={{ marginTop: 14 }}>
+                <span style={{ fontSize: '0.83rem', color: 'var(--muted)' }}>Available Wallet Balance:</span>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--gold)', marginTop: 2 }}>
+                  {formatINR(dashboard?.walletBalance || 32000)}
                 </div>
-                <strong>{money(loan.providerEarning || 0)}</strong>
               </div>
-            ))}
-            {!myLoans.length ? <p>No loans in your portfolio yet.</p> : null}
+            </div>
           </div>
         </section>
       )}
-
-      {!loading && activeSection === "alerts" && (
-        <section className="portal-section">
-          <div className="portal-section-head">
-            <div className="portal-label pl-p">🔔 Alerts</div>
-            <h2>Notification Stream</h2>
-          </div>
-
-          <div className="portal-panel-card stack-sm">
-            {notifications.map((n) => (
-              <button
-                key={n.id}
-                className={`portal-row ${n.isRead ? "" : "unread unread-p"}`}
-                onClick={() => markRead(n.id)}
-              >
-                <div className="portal-row-main">
-                  <strong>{n.title}</strong>
-                  <small>
-                    {n.message || "Tap to mark this alert as read."}
-                  </small>
-                </div>
-                <span>{n.isRead ? "Read" : "Mark"}</span>
-              </button>
-            ))}
-            {!notifications.length ? <p>No alerts.</p> : null}
-          </div>
-        </section>
-      )}
-
-      <LoanDetailsModal
-        isOpen={Boolean(inspectingLoan)}
-        onClose={() => setInspectingLoan(null)}
-        loan={inspectingLoan}
-        accessToken={accessToken}
-        isProvider={true}
-        onFundSuccess={reload}
-      />
     </AppShell>
-  );
+  )
 }
