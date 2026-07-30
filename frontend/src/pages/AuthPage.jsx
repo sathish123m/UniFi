@@ -357,13 +357,32 @@ export default function AuthPage() {
             />
 
             {devOtp ? (
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setTwoFaCode(devOtp)}
+              <div
+                style={{
+                  background: 'rgba(201, 168, 76, 0.12)',
+                  border: '1px solid rgba(201, 168, 76, 0.4)',
+                  borderRadius: 12,
+                  padding: 14,
+                  marginTop: 8,
+                  marginBottom: 8,
+                  textAlign: 'center',
+                }}
               >
-                Use Dev OTP ({devOtp})
-              </button>
+                <div style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  ⚡ 2FA Verification Code
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: 6, margin: '4px 0', color: 'var(--text)' }}>
+                  {devOtp}
+                </div>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => setTwoFaCode(devOtp)}
+                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', borderRadius: 8, marginTop: 4 }}
+                >
+                  ✨ Auto-Fill 2FA Code
+                </button>
+              </div>
             ) : null}
 
             <button className="btn btn-primary" disabled={loading || twoFaCode.length !== 6} type="submit">
@@ -583,13 +602,32 @@ export default function AuthPage() {
             </label>
 
             {devOtp ? (
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setOtpForm((p) => ({ ...p, otp: devOtp }))}
+              <div
+                style={{
+                  background: 'rgba(201, 168, 76, 0.12)',
+                  border: '1px solid rgba(201, 168, 76, 0.4)',
+                  borderRadius: 12,
+                  padding: 14,
+                  marginTop: 10,
+                  marginBottom: 10,
+                  textAlign: 'center',
+                }}
               >
-                Use Dev OTP
-              </button>
+                <div style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  ⚡ Instant Verification Code
+                </div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: 6, margin: '4px 0', color: 'var(--text)' }}>
+                  {devOtp}
+                </div>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => setOtpForm((p) => ({ ...p, otp: devOtp }))}
+                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', borderRadius: 8, marginTop: 4 }}
+                >
+                  ✨ Auto-Fill Code
+                </button>
+              </div>
             ) : null}
             <button
               className="btn btn-primary"
