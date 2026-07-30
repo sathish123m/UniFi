@@ -399,22 +399,18 @@ const logout = async (token) => {
 
 const resendOtp = async (email, purpose, requestedRole) => {
   const normalizedEmail = normalizeEmail(email);
-  const requested = normalizeRequestedRole(requestedRole);
+  let requested = normalizeRequestedRole(requestedRole);
 
-  const users = await findUsersByPortal(normalizedEmail, requested);
-  if (!users.length) {
-    if (requested) throw err(roleAccessError(requested), 403);
-    throw err("User not found", 404);
+  let users = await findUsersByPortal(normalizedEmail, requested);
+  if (!users.length && requested) {
+    users = await findUsersByPortal(normalizedEmail, undefined);
   }
-  if (users.length > 1 && !requested) {
-    throw err(
-      "Multiple accounts found for this email. Choose borrower or provider portal before requesting OTP.",
-      400,
-    );
+  if (!users.length) {
+    throw err("No account found for this email address.", 404);
   }
 
   const targetUser = users[0];
-  const otp = await sendOtp(targetUser.id, normalizedEmail, purpose);
+  const otp = await sendOtp(targetUser.id, normalizedEmail, purpose || "EMAIL_VERIFY");
   return {
     message: "OTP sent",
     ...(exposeDevOtp && { devOtp: otp }),
