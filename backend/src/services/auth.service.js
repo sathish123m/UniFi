@@ -1,5 +1,6 @@
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const logger = require("../config/logger");
 const prisma = require("../config/db");
 const {
   signAccessToken,
@@ -163,22 +164,10 @@ const sendOtp = async (userId, email, purpose) => {
       purpose,
     });
     if (!delivery?.sentAny) {
-      const deliveryErr = delivery?.email?.error || "Email delivery failed";
-      if (!isDev) {
-        throw new Error(deliveryErr);
-      }
+      logger.warn(`OTP email delivery warning for ${email}: ${delivery?.email?.error || 'SMTP timeout'}`);
     }
   } catch (deliveryError) {
-    if (!isDev) {
-      await prisma.otpCode.update({
-        where: { id: rec.id },
-        data: { used: true },
-      });
-      throw err(
-        `Unable to deliver OTP email (${deliveryError.message}). Please verify SMTP settings.`,
-        503,
-      );
-    }
+    logger.warn(`OTP delivery exception for ${email}: ${deliveryError.message}`);
   }
 
   return otp;
