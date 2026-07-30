@@ -15,16 +15,16 @@ const smtpFrom = smtpFromAddress.includes('<') ? smtpFromAddress : `${smtpFromNa
 const isProduction = (process.env.NODE_ENV || 'development') === 'production'
 const strictEmailDelivery = String(process.env.SMTP_STRICT || (isProduction ? 'true' : 'false')).toLowerCase() === 'true'
 
-// 2. TRANSPORTER CREATION (ENFORCE PORT 465 DIRECT SSL FOR GMAIL)
+// 2. TRANSPORTER CREATION (ENFORCE PORT 465 DIRECT SSL WITH 3S TIMEOUT)
 const createGmailTransporter = () =>
   nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
     auth: { user: cleanUser, pass: cleanPass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 3000,
+    greetingTimeout: 3000,
+    socketTimeout: 5000,
     tls: { rejectUnauthorized: false },
   })
 
@@ -34,9 +34,9 @@ const createCustomTransporter = () =>
     port: smtpPort,
     secure: smtpPort === 465,
     auth: { user: cleanUser, pass: cleanPass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 3000,
+    greetingTimeout: 3000,
+    socketTimeout: 5000,
     tls: { rejectUnauthorized: false },
   })
 
@@ -68,7 +68,31 @@ const sendMailViaSmtp = async (mailOptions) => {
   }
 }
 
-// 4. API FALLBACK PROVIDERS (BREVO & MAILJET)
+// 4. API FALLBACK PROVIDERS (RESEND, BREVO, MAILJET)
+const sendMailViaResendApi = async ({ to, subject, text, html }) => {
+  const resendKey = String(process.env.RESEND_API_KEY || '').trim()
+  if (!resendKey) throw new Error('RESEND_API_KEY not set')
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${resendKey}`,
+    },
+    body: JSON.stringify({
+      from: `${smtpFromName} <onboarding@resend.dev>`,
+      to: [to],
+      subject,
+      html,
+      text,
+    }),
+  })
+  const raw = await res.text()
+  if (!res.ok) throw new Error(`Resend API ${res.status}: ${raw.slice(0, 180)}`)
+  const parsed = raw ? JSON.parse(raw) : null
+  return { messageId: parsed?.id || 'resend-sent', response: `Resend API ${res.status}` }
+}
+
 const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
   const brevoApiKey = String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim()
   if (!brevoApiKey) throw new Error('BREVO_API_KEY not set')
@@ -145,15 +169,24 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
   } catch (smtpErr) {
     logger.warn(`Primary SMTP failed for ${email}: ${smtpErr.message}`)
 
-    // Fallback 1: Brevo API
+    // Fallback 1: Resend API
+    try {
+      const info = await sendMailViaResendApi({ to: email, subject, text, html })
+      logger.info(`OTP sent to ${email} via Resend API fallback`)
+      return { sent: true, channel: 'email', provider: 'RESEND_API', response: info.response, messageId: info.messageId }
+    } catch (_rErr) {}
+
+    // Fallback 2: Brevo API
     try {
       const info = await sendMailViaBrevoApi({ to: email, subject, text, html })
+      logger.info(`OTP sent to ${email} via Brevo API fallback`)
       return { sent: true, channel: 'email', provider: 'BREVO_API', response: info.response, messageId: info.messageId }
     } catch (_bErr) {}
 
-    // Fallback 2: Mailjet API
+    // Fallback 3: Mailjet API
     try {
       const info = await sendMailViaMailjetApi({ to: email, subject, text, html })
+      logger.info(`OTP sent to ${email} via Mailjet API fallback`)
       return { sent: true, channel: 'email', provider: 'MAILJET_API', response: info.response, messageId: info.messageId }
     } catch (_mErr) {}
 
