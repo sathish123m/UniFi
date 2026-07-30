@@ -42,22 +42,22 @@ const checkPaymentSecrets = () => {
 const checkEmailProviderConfig = () => {
   const provider = String(process.env.EMAIL_PROVIDER || 'SMTP').trim().toUpperCase()
   if (!['SMTP', 'BREVO_API', 'MAILJET_API'].includes(provider)) {
-    err('EMAIL_PROVIDER must be SMTP, BREVO_API or MAILJET_API')
+    logger.warn('[ENV] EMAIL_PROVIDER should be SMTP, BREVO_API or MAILJET_API')
   }
 
   if (provider === 'BREVO_API') {
     const key = String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim()
-    if (!key) err('BREVO_API_KEY is required when EMAIL_PROVIDER=BREVO_API')
-    if (key.length < 20 || /PASTE_/i.test(key)) err('BREVO_API_KEY looks invalid')
+    if (!key || key.length < 10 || /PASTE_/i.test(key)) {
+      logger.warn('[ENV] BREVO_API_KEY missing or invalid; email fallback will be used')
+    }
   }
 
   if (provider === 'MAILJET_API') {
     const key = String(process.env.MAILJET_API_KEY || process.env.SMTP_USER || '').trim()
     const secret = String(process.env.MAILJET_API_SECRET || process.env.SMTP_PASS || '').trim()
-    if (!key) err('MAILJET_API_KEY is required when EMAIL_PROVIDER=MAILJET_API')
-    if (!secret) err('MAILJET_API_SECRET is required when EMAIL_PROVIDER=MAILJET_API')
-    if (key.length < 20 || /PASTE_/i.test(key)) err('MAILJET_API_KEY looks invalid')
-    if (secret.length < 20 || /PASTE_/i.test(secret)) err('MAILJET_API_SECRET looks invalid')
+    if (!key || !secret || key.length < 10 || secret.length < 10 || /PASTE_/i.test(key) || /PASTE_/i.test(secret)) {
+      logger.warn('[ENV] MAILJET_API_KEY / SECRET missing or short; email fallback will be used')
+    }
   }
 }
 
