@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniFi — Borrower</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--base);color:var(--ink);overflow-x:hidden;}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+:root{
+  --base:#eef4f8;
+  --sidebar:#cfe2ee;
+  --card:#ffffff;
+  --ink:#1f2937;
+  --ink-dim:#64748b;
+  --ink-faint:#94a3ae;
+  --blush:#e8a99b;
+  --blush-dim:#d99686;
+  --sage:#8fbfa3;
+  --sage-dim:#6fa98f;
+  --amber:#e0b168;
+  --border:rgba(31,41,55,.08);
+  --border-strong:rgba(31,41,55,.14);
+  --shadow:0 20px 40px -26px rgba(31,41,55,.22);
+  --radius-lg:22px;
+  --radius-md:16px;
+  --radius-sm:10px;
+}
+h1,h2,h3,h4{font-family:'Poppins',sans-serif;font-weight:600;color:var(--ink);}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.icon{width:18px;height:18px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+.screen{display:none;}
+.screen.active{display:block;}
+
+/* ============ LOGIN ============ */
+#screen-login.active{display:flex;min-height:100vh;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:24px;}
+.soft-circle{position:absolute;border-radius:50%;filter:blur(2px);}
+.sc1{width:420px;height:420px;background:#cfe2ee;top:-140px;left:-120px;}
+.sc2{width:280px;height:280px;background:var(--blush);opacity:.35;bottom:-100px;right:-80px;}
+.sc3{width:150px;height:150px;background:var(--sage);opacity:.25;top:56%;right:8%;}
+.login-card{
+  width:100%;max-width:420px;background:var(--card);border-radius:var(--radius-lg);
+  padding:44px 38px;box-shadow:var(--shadow);position:relative;z-index:2;
+  animation:cardIn .5s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.login-brand{display:flex;align-items:center;gap:8px;font-family:'Poppins',sans-serif;font-weight:700;font-size:18px;}
+.login-brand .dot{width:8px;height:8px;border-radius:50%;background:var(--blush);}
+.role-tag{display:inline-flex;margin-top:16px;padding:5px 13px;border-radius:100px;background:rgba(31,41,55,.06);color:var(--ink-dim);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;}
+.login-card h1{font-size:25px;margin-top:16px;}
+.login-card p.sub{font-size:14px;color:var(--ink-dim);margin-top:8px;line-height:1.55;max-width:320px;}
+.field{margin-top:20px;position:relative;}
+.field label{font-size:11.5px;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em;}
+.field input,.field select,.field textarea{
+  width:100%;margin-top:8px;padding:13px 16px;border-radius:12px;background:#f5f8fa;
+  border:1.5px solid var(--border);color:var(--ink);font-size:14.5px;font-family:'Inter',sans-serif;
+  transition:border-color .2s;
+}
+.field textarea{resize:vertical;min-height:88px;}
+.field select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3ae' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+#pwInput{padding-right:64px;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blush);background:#fff;}
+.pw-toggle{position:absolute;right:14px;top:37px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-faint);}
+.forgot-link{display:inline-block;margin-top:9px;font-size:12.5px;color:var(--blush-dim);font-weight:500;}
+.btn-login{
+  width:100%;margin-top:26px;padding:14px;border-radius:12px;background:var(--blush);color:#3a1f16;
+  font-family:'Poppins',sans-serif;font-weight:600;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .2s,box-shadow .2s;box-shadow:0 10px 26px -10px rgba(232,169,155,.7);
+}
+.btn-login:hover{transform:translateY(-1px);box-shadow:0 14px 30px -8px rgba(232,169,155,.85);}
+.btn-login:active{transform:scale(.98);}
+.divider{display:flex;align-items:center;gap:12px;margin:24px 0 18px;color:var(--ink-faint);font-size:12.5px;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border-strong);}
+.btn-secondary-full{width:100%;padding:13px;border-radius:12px;background:transparent;border:1.5px solid var(--border-strong);color:var(--ink);font-weight:600;font-size:14px;}
+.btn-secondary-full:hover{border-color:var(--blush);}
+.trust-footnote{margin-top:22px;text-align:center;font-size:12px;color:var(--ink-faint);display:flex;align-items:center;justify-content:center;gap:6px;}
+.trust-footnote svg{width:13px;height:13px;color:var(--sage-dim);}
+
+/* ============ DASHBOARD SHELL ============ */
+#screen-dashboard.active{display:flex;min-height:100vh;}
+.sidebar{
+  width:248px;background:var(--sidebar);flex:none;display:flex;flex-direction:column;
+  padding:26px 18px;position:sticky;top:0;height:100vh;
+}
+.sidebar-brand{display:flex;align-items:center;gap:8px;font-family:'Poppins',sans-serif;font-weight:700;font-size:17px;padding:0 8px;margin-bottom:8px;}
+.sidebar-brand .dot{width:8px;height:8px;border-radius:50%;background:var(--blush);}
+.sidebar-nav{margin-top:26px;display:flex;flex-direction:column;gap:2px;flex:1;}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;font-size:13.8px;font-weight:500;
+  color:var(--ink-dim);transition:background .2s,color .2s;
+}
+.nav-item:hover{background:rgba(255,255,255,.5);color:var(--ink);}
+.nav-item.active{background:#fff;color:var(--ink);box-shadow:0 4px 14px -6px rgba(31,41,55,.18);position:relative;}
+.nav-item.active::before{content:'';position:absolute;left:-18px;top:50%;transform:translateY(-50%);width:4px;height:18px;border-radius:4px;background:var(--blush);}
+.sidebar-footer{border-top:1px solid rgba(31,41,55,.09);padding-top:16px;margin-top:10px;}
+.mini-profile{display:flex;align-items:center;gap:10px;padding:6px 8px;}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blush),var(--sage));display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-weight:600;font-size:13px;color:#fff;flex:none;}
+.mini-profile-name{font-size:13px;font-weight:600;}
+.mini-profile-role{font-size:11px;color:var(--ink-dim);}
+.logout-btn{margin-top:10px;width:100%;text-align:left;padding:9px 8px;font-size:13px;color:var(--ink-dim);border-radius:10px;display:flex;align-items:center;gap:10px;}
+.logout-btn:hover{background:rgba(255,255,255,.5);color:var(--ink);}
+
+.dash-main{flex:1;padding:32px 40px 60px;min-width:0;}
+.dash-topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;}
+.dash-topbar h2{font-size:23px;}
+.dash-topbar .date{font-size:13px;color:var(--ink-dim);margin-top:4px;}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.icon-btn{width:40px;height:40px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);position:relative;}
+.icon-btn .dot-badge{position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--blush);border:1.5px solid #fff;}
+.mobile-menu-btn{display:none;}
+
+.dash-section{display:none;}
+.dash-section.active{display:block;}
+
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:20px;}
+.card{background:var(--card);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.stat-card h4{font-size:12.5px;color:var(--ink-dim);font-weight:500;font-family:'Inter',sans-serif;}
+.stat-value{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;margin-top:10px;color:var(--ink);}
+.stat-value .unit{color:var(--blush-dim);font-size:15px;}
+.ring-wrap{display:flex;align-items:center;gap:16px;margin-top:6px;}
+.ring-wrap svg{transform:rotate(-90deg);}
+.ring-track{fill:none;stroke:rgba(31,41,55,.08);stroke-width:7;}
+.ring-fill{fill:none;stroke:var(--sage);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset 1.1s cubic-bezier(.2,.7,.2,1);}
+.ring-pct{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;}
+.ring-label{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+.kyc-badge{display:inline-flex;align-items:center;gap:7px;margin-top:12px;padding:7px 13px;border-radius:100px;background:rgba(143,191,163,.18);color:var(--sage-dim);font-size:13px;font-weight:600;}
+.kyc-badge svg{width:15px;height:15px;}
+
+.content-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:20px;}
+.loan-card .card-head{display:flex;justify-content:space-between;align-items:flex-start;}
+.loan-card h4{font-size:15px;}
+.loan-card .card-head .amt{font-family:'IBM Plex Mono',monospace;font-size:15px;color:var(--ink-dim);}
+.status-pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:4px 10px;border-radius:100px;text-transform:uppercase;letter-spacing:.03em;}
+.status-pill.active{background:rgba(224,177,104,.2);color:#96712c;}
+.status-pill.pending{background:rgba(224,177,104,.2);color:#96712c;}
+.status-pill.approved{background:rgba(143,191,163,.22);color:var(--sage-dim);}
+.status-pill.rejected{background:rgba(232,169,155,.32);color:#a13f2c;}
+.status-pill.completed{background:rgba(31,41,55,.08);color:var(--ink-dim);}
+.status-pill.paid{background:rgba(143,191,163,.22);color:var(--sage-dim);}
+.status-pill.upcoming{background:rgba(31,41,55,.06);color:var(--ink-dim);}
+.progress-track{height:8px;border-radius:100px;background:rgba(31,41,55,.07);margin-top:18px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--sage-dim),var(--sage));width:0%;transition:width 1.2s cubic-bezier(.2,.7,.2,1);}
+.progress-labels{display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--ink-dim);}
+.progress-labels .mono{color:var(--ink);}
+.loan-meta{display:flex;gap:22px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+.loan-meta div span{display:block;font-size:11px;color:var(--ink-faint);margin-bottom:3px;}
+.loan-meta div b{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;}
+
+.repay-card{background:linear-gradient(160deg,#fff, #fdf3ef);}
+.repay-card .re-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--blush-dim);letter-spacing:.05em;text-transform:uppercase;}
+.repay-card .re-amount{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;margin-top:10px;}
+.repay-card .re-due{font-size:13px;color:var(--ink-dim);margin-top:6px;}
+.repay-btn{margin-top:20px;width:100%;padding:13px;border-radius:12px;background:var(--ink);color:#fdf3ef;font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;}
+.repay-btn:hover{background:#111826;}
+
+.quick-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.qa-btn{background:var(--card);border-radius:var(--radius-md);padding:18px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:transform .2s;text-align:left;}
+.qa-btn:hover{transform:translateY(-3px);}
+.qa-icon{width:38px;height:38px;border-radius:11px;background:rgba(232,169,155,.16);display:flex;align-items:center;justify-content:center;}
+.qa-icon svg{color:var(--blush-dim);}
+.qa-btn span{font-size:13.5px;font-weight:600;}
+
+.activity-card h4{font-size:15px;margin-bottom:6px;}
+.activity-row{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border);}
+.activity-row:last-child{border-bottom:none;}
+.activity-ic{width:34px;height:34px;border-radius:10px;background:rgba(31,41,55,.05);display:flex;align-items:center;justify-content:center;flex:none;}
+.activity-ic svg{width:16px;height:16px;color:var(--ink-dim);}
+.activity-row.good .activity-ic{background:rgba(143,191,163,.18);}
+.activity-row.good .activity-ic svg{color:var(--sage-dim);}
+.activity-text{flex:1;}
+.activity-text .t1{font-size:13.5px;font-weight:500;}
+.activity-text .t2{font-size:11.5px;color:var(--ink-faint);margin-top:2px;}
+.activity-amt{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink-dim);}
+.receipt-btn{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-left:6px;}
+.receipt-btn:hover{background:rgba(31,41,55,.06);}
+
+/* ============ NEW: section header ============ */
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;margin:6px 0 16px;flex-wrap:wrap;gap:12px;}
+.sec-head h2{font-size:17px;}
+
+/* ============ NEW: forms / two-col grids ============ */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}
+.btn-dark{padding:13px 24px;border-radius:12px;background:var(--ink);color:#fdf3ef;font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:8px;transition:background .2s;}
+.btn-dark:hover{background:#111826;}
+.btn-outline{padding:11px 20px;border-radius:12px;border:1.5px solid var(--border-strong);font-weight:600;font-size:13.2px;color:var(--ink);background:transparent;transition:border-color .2s;}
+.btn-outline:hover{border-color:var(--blush);}
+
+/* ============ NEW: profile header ============ */
+.profile-head{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.avatar-lg{width:74px;height:74px;border-radius:50%;background:linear-gradient(135deg,var(--blush),var(--sage));display:flex;align-items:center;justify-content:center;font-family:'Poppins',sans-serif;font-weight:600;font-size:26px;color:#fff;position:relative;flex:none;}
+.avatar-edit{position:absolute;bottom:-2px;right:-2px;width:26px;height:26px;border-radius:50%;background:var(--ink);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.25);}
+.avatar-edit svg{width:13px;height:13px;}
+.ph-info h3{font-size:19px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.ph-info .ph-meta{font-size:12.6px;color:var(--ink-dim);margin-top:7px;display:flex;gap:16px;flex-wrap:wrap;}
+.ph-info .ph-meta span{display:flex;align-items:center;gap:6px;}
+.ph-info .ph-meta svg{width:13px;height:13px;color:var(--ink-faint);}
+.ph-actions{margin-left:auto;}
+.verified-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:var(--sage-dim);background:rgba(143,191,163,.18);padding:3px 9px;border-radius:100px;font-weight:600;}
+.verified-tag svg{width:10px;height:10px;}
+
+/* ============ NEW: dropzone ============ */
+.dropzone{border:2px dashed var(--border-strong);border-radius:var(--radius-md);padding:22px;text-align:center;background:#f7fafc;transition:border-color .2s;}
+.dropzone:hover{border-color:var(--blush);}
+.dropzone svg{width:26px;height:26px;color:var(--ink-faint);margin:0 auto 8px;}
+.dropzone .dz-title{font-size:13px;font-weight:600;}
+.dropzone .dz-sub{font-size:11.2px;color:var(--ink-faint);margin-top:4px;}
+
+/* ============ NEW: toggle ============ */
+.toggle{width:42px;height:24px;border-radius:100px;background:rgba(31,41,55,.15);position:relative;transition:background .2s;flex:none;cursor:pointer;}
+.toggle.on{background:var(--sage);}
+.toggle .knob{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+.toggle.on .knob{left:21px;}
+
+/* ============ NEW: KYC stepper + items ============ */
+.kyc-progress{display:flex;align-items:center;}
+.kyc-step{flex:1;text-align:center;position:relative;}
+.kyc-step .ksn{width:32px;height:32px;border-radius:50%;background:rgba(31,41,55,.06);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;color:var(--ink-dim);position:relative;z-index:2;}
+.kyc-step.done .ksn{background:var(--sage);color:#fff;}
+.kyc-step .ksl{font-size:10.8px;color:var(--ink-dim);font-weight:500;}
+.kyc-step::before{content:'';position:absolute;top:16px;left:-50%;width:100%;height:2px;background:var(--border-strong);z-index:1;}
+.kyc-step:first-child::before{display:none;}
+.kyc-step.done::before{background:var(--sage);}
+.kyc-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);}
+.kyc-item:last-child{border-bottom:none;}
+.kii{width:40px;height:40px;border-radius:12px;background:rgba(31,41,55,.05);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink-dim);}
+.kyc-item.done .kii,.kii.good{background:rgba(143,191,163,.2);color:var(--sage-dim);}
+.kit{flex:1;min-width:0;}
+.kit h5{font-size:13.8px;font-weight:600;}
+.kit p{font-size:11.8px;color:var(--ink-dim);margin-top:3px;}
+.kis{flex:none;}
+
+/* ============ NEW: segmented tabs ============ */
+.seg-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.seg-tab{padding:9px 18px;border-radius:100px;font-size:12.5px;font-weight:600;color:var(--ink-dim);background:rgba(31,41,55,.05);transition:background .2s,color .2s;}
+.seg-tab.active{background:var(--ink);color:#fdf3ef;}
+
+/* ============ NEW: request cards ============ */
+.req-card{display:flex;align-items:center;gap:16px;}
+.req-icon{width:42px;height:42px;border-radius:12px;background:rgba(232,169,155,.16);color:var(--blush-dim);display:flex;align-items:center;justify-content:center;flex:none;}
+.req-info{flex:1;min-width:0;}
+.req-info h5{font-size:14.5px;font-weight:600;}
+.req-info .rmeta{font-size:11.8px;color:var(--ink-faint);margin-top:4px;}
+.req-amt{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;flex:none;}
+
+/* ============ NEW: schedule table ============ */
+.sched-table{width:100%;}
+.sched-row{display:grid;grid-template-columns:32px 1fr 100px 120px 90px;gap:10px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--border);font-size:13px;}
+.sched-row.head{font-size:10.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace;border-bottom:1.5px solid var(--border-strong);padding-bottom:10px;}
+.sched-row:last-child{border-bottom:none;}
+.sched-n{font-family:'IBM Plex Mono',monospace;color:var(--ink-faint);}
+.sched-amt{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+.pay-mini-btn{padding:6px 14px;border-radius:100px;background:var(--ink);color:#fdf3ef;font-size:11.2px;font-weight:600;justify-self:start;}
+
+/* ============ NEW: notifications ============ */
+.notif-row{display:flex;gap:14px;padding:14px 6px;border-bottom:1px solid var(--border);align-items:flex-start;border-radius:12px;}
+.notif-row:last-child{border-bottom:none;}
+.notif-row.unread{background:rgba(232,169,155,.06);}
+.notif-ic{width:36px;height:36px;border-radius:10px;background:rgba(31,41,55,.05);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink-dim);}
+.notif-ic.good{background:rgba(143,191,163,.2);color:var(--sage-dim);}
+.notif-ic.warn{background:rgba(224,177,104,.22);color:#96712c;}
+.notif-text{flex:1;}
+.notif-text .n1{font-size:13.3px;font-weight:500;}
+.notif-text .n2{font-size:11.3px;color:var(--ink-faint);margin-top:3px;}
+
+/* ============ NEW: FAQ accordion ============ */
+.faq-item{border-bottom:1px solid var(--border);cursor:pointer;}
+.faq-item:last-child{border-bottom:none;}
+.faq-q{padding:15px 2px;display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:13.6px;}
+.faq-q svg{width:15px;height:15px;color:var(--ink-dim);transition:transform .25s;flex:none;}
+.faq-item.open .faq-q svg{transform:rotate(180deg);}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease;font-size:12.6px;color:var(--ink-dim);line-height:1.6;padding:0 2px;}
+.faq-item.open .faq-a{max-height:220px;padding-bottom:15px;}
+
+/* ============ NEW: support cards ============ */
+.support-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.support-card{text-align:center;padding:24px 18px;}
+.spic{width:42px;height:42px;border-radius:13px;background:rgba(232,169,155,.16);color:var(--blush-dim);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+.support-card h5{font-size:14px;}
+.support-card p{font-size:11.8px;color:var(--ink-dim);margin-top:6px;line-height:1.5;}
+.support-card button{margin-top:14px;}
+
+/* ============ 3D tilt ============ */
+.tilt{transition:transform .15s ease-out;will-change:transform;}
+
+/* mobile bottom nav */
+.bottom-nav{display:none;}
+
+@media(max-width:980px){
+  .content-grid{grid-template-columns:1fr;}
+  .stat-row{grid-template-columns:1fr 1fr;}
+  .quick-actions{grid-template-columns:1fr 1fr;}
+  .form-grid{grid-template-columns:1fr;}
+  .support-grid{grid-template-columns:1fr;}
+  .sched-row{grid-template-columns:26px 1fr 84px 96px 70px;font-size:12px;}
+}
+@media(max-width:860px){
+  .sidebar{position:fixed;left:0;top:0;z-index:100;transform:translateX(-100%);transition:transform .3s ease;box-shadow:0 0 40px rgba(0,0,0,.2);}
+  .sidebar.open{transform:translateX(0);}
+  .mobile-menu-btn{display:flex;}
+  .dash-main{padding:22px 18px 90px;}
+  .stat-row{grid-template-columns:1fr;}
+  .quick-actions{grid-template-columns:1fr 1fr;}
+  .bottom-nav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;
+    box-shadow:0 -8px 24px rgba(31,41,55,.1);padding:10px 6px 14px;z-index:90;
+  }
+  .bottom-nav .bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:var(--ink-faint);}
+  .bottom-nav .bn-item.active{color:var(--blush-dim);}
+  .bottom-nav .bn-item svg{width:19px;height:19px;}
+}
+@media(max-width:520px){
+  .quick-actions{grid-template-columns:1fr 1fr;}
+  .loan-meta{flex-wrap:wrap;gap:14px;}
+  .profile-head{flex-direction:column;align-items:flex-start;}
+  .ph-actions{margin-left:0;}
+  .sched-row{grid-template-columns:20px 1fr 70px;}
+  .sched-row span:nth-child(4),.sched-row span:nth-child(5){display:none;}
+}
+</style>
+</head>
+<body>
+
+<svg style="display:none">
+  <symbol id="ic-home" viewBox="0 0 24 24"><path d="M4 11.5 L12 4 L20 11.5"/><path d="M6 10 V20 H10 V15 H14 V20 H18 V10"/></symbol>
+  <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.3"/><path d="M5 20 c0 -4.5 3.1 -7 7 -7 s7 2.5 7 7"/></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 2 L20 6 V12 C20 17.2 16.4 20.6 12 22 C7.6 20.6 4 17.2 4 12 V6 Z"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></symbol>
+  <symbol id="ic-wallet" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2.5"/><path d="M3 10.5 h18"/><circle cx="16.2" cy="14.5" r="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></symbol>
+  <symbol id="ic-repeat" viewBox="0 0 24 24"><polyline points="17 2 21 6 17 10"/><path d="M3 12 V10 a4 4 0 0 1 4 -4 h14"/><polyline points="7 22 3 18 7 14"/><path d="M21 12 v2 a4 4 0 0 1 -4 4 H3"/></symbol>
+  <symbol id="ic-card" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><line x1="3" y1="10.5" x2="21" y2="10.5"/><line x1="6.5" y1="15" x2="10.5" y2="15"/></symbol>
+  <symbol id="ic-bell" viewBox="0 0 24 24"><path d="M6 10.5 a6 6 0 0 1 12 0 c0 4 1.5 5.5 1.5 5.5 H4.5 c0 0 1.5 -1.5 1.5 -5.5 Z"/><path d="M10 19 a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="ic-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.3 a2.8 2.8 0 1 1 4 2.6 c-.9 .5 -1.2 1 -1.2 2.1"/><circle cx="12" cy="17" r=".4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11 V7.5 a4 4 0 0 1 8 0 V11"/></symbol>
+  <symbol id="ic-arrow" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="8 12.5 11 15.5 16 9"/></symbol>
+  <symbol id="ic-logout" viewBox="0 0 24 24"><path d="M9 21 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+  <symbol id="ic-camera" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7 L9.5 4.5 H14.5 L16 7"/><circle cx="12" cy="13.5" r="4"/></symbol>
+  <symbol id="ic-id" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.3" cy="11" r="2.2"/><line x1="5.5" y1="15.3" x2="11" y2="15.3"/><line x1="13.5" y1="9.5" x2="18.5" y2="9.5"/><line x1="13.5" y1="12.5" x2="18.5" y2="12.5"/></symbol>
+  <symbol id="ic-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 20 c0 -3.8 2.5 -6 5.5 -6 s5.5 2.2 5.5 6"/><circle cx="17.2" cy="9.3" r="2.4"/><path d="M15.5 14.2 c2.7 .3 4.5 2.3 4.5 5.8"/></symbol>
+  <symbol id="ic-doc" viewBox="0 0 24 24"><path d="M6 3 H14 L19 8 V21 H6 Z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="13" x2="16" y2="13"/><line x1="9" y1="17" x2="14" y2="17"/></symbol>
+  <symbol id="ic-upload" viewBox="0 0 24 24"><path d="M12 16 V4"/><polyline points="7 9 12 4 17 9"/><path d="M4 16 v3 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-3"/></symbol>
+  <symbol id="ic-download" viewBox="0 0 24 24"><path d="M12 4 V16"/><polyline points="7 11 12 16 17 11"/><path d="M4 16 v3 a2 2 0 0 0 2 2 h12 a2 2 0 0 0 2 -2 v-3"/></symbol>
+  <symbol id="ic-phone" viewBox="0 0 24 24"><path d="M6 3 h4 l1.5 4.5 L9 9.5 c1 2.5 3 4.5 5.5 5.5 l2 -2.5 L21 14 V18 a2 2 0 0 1 -2 2 C10.5 20 4 13.5 4 5 a2 2 0 0 1 2 -2 Z"/></symbol>
+  <symbol id="ic-send" viewBox="0 0 24 24"><path d="M21 3 L3 10.5 L10 13 L13 20 Z"/><line x1="10" y1="13" x2="21" y2="3"/></symbol>
+  <symbol id="ic-chevron" viewBox="0 0 24 24"><polyline points="9 5 16 12 9 19"/></symbol>
+  <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M12 3 L22 20 H2 Z"/><line x1="12" y1="9" x2="12" y2="14"/><circle cx="12" cy="17" r=".4" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ic-mail" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><polyline points="3.5 6.5 12 13 20.5 6.5"/></symbol>
+</svg>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div class="screen active" id="screen-login">
+  <div class="soft-circle sc1"></div>
+  <div class="soft-circle sc2"></div>
+  <div class="soft-circle sc3"></div>
+  <div class="login-card">
+    <div class="login-brand"><span class="dot"></span>UniFi</div>
+    <span class="role-tag">Borrower</span>
+    <h1>Welcome back</h1>
+    <p class="sub">Log in with your verified university email to check your requests and repayments.</p>
+    <div class="field">
+      <label>UNIVERSITY EMAIL</label>
+      <input type="email" id="loginEmail" placeholder="priya.sharma@nituni.edu.in" value="priya.sharma@nituni.edu.in">
+    </div>
+    <div class="field">
+      <label>PASSWORD</label>
+      <input type="password" id="pwInput" placeholder="••••••••" value="••••••••••">
+      <button class="pw-toggle" onclick="togglePw()">SHOW</button>
+      <a class="forgot-link" href="#">Forgot password?</a>
+    </div>
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">Log in <svg class="icon"><use href="#ic-arrow"/></svg></button>
+    <div class="divider"><span>New to UniFi?</span></div>
+    <button class="btn-secondary-full">Create a Borrower account</button>
+    <p class="trust-footnote"><svg><use href="#ic-shield"/></svg> Verified campus network only</p>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD SCREEN ============ -->
+<div class="screen" id="screen-dashboard">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><span class="dot"></span>UniFi</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-sec="overview" onclick="switchSection('overview')"><svg class="icon"><use href="#ic-home"/></svg>Overview</a>
+      <a class="nav-item" data-sec="account" onclick="switchSection('account')"><svg class="icon"><use href="#ic-user"/></svg>Account</a>
+      <a class="nav-item" data-sec="kyc" onclick="switchSection('kyc')"><svg class="icon"><use href="#ic-shield"/></svg>KYC &amp; Verification</a>
+      <a class="nav-item" data-sec="borrow" onclick="switchSection('borrow')"><svg class="icon"><use href="#ic-wallet"/></svg>Borrow Request</a>
+      <a class="nav-item" data-sec="repay" onclick="switchSection('repay')"><svg class="icon"><use href="#ic-repeat"/></svg>Repayment Center</a>
+      <a class="nav-item" data-sec="notifications" onclick="switchSection('notifications')"><svg class="icon"><use href="#ic-bell"/></svg>Notifications</a>
+      <a class="nav-item" data-sec="help" onclick="switchSection('help')"><svg class="icon"><use href="#ic-help"/></svg>Help / Support</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="mini-profile">
+        <div class="avatar">PS</div>
+        <div><div class="mini-profile-name">Priya Sharma</div><div class="mini-profile-role">Borrower · NIT campus</div></div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()"><svg class="icon"><use href="#ic-logout"/></svg>Log out</button>
+    </div>
+  </aside>
+
+  <main class="dash-main">
+    <header class="dash-topbar">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="icon-btn mobile-menu-btn" onclick="toggleSidebar()" style="box-shadow:none;background:rgba(31,41,55,.06);"><svg class="icon"><use href="#ic-home"/></svg></button>
+        <div>
+          <h2 id="topTitle">Good afternoon, Priya</h2>
+          <div class="date" id="topSub">Tuesday, 28 July</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" onclick="switchSection('notifications')"><svg class="icon"><use href="#ic-bell"/></svg><span class="dot-badge"></span></button>
+        <div class="avatar">PS</div>
+      </div>
+    </header>
+
+    <!-- ===== OVERVIEW ===== -->
+    <section class="dash-section active" id="sec-overview">
+      <section class="stat-row">
+        <div class="card stat-card">
+          <h4>Available credit limit</h4>
+          <div class="stat-value">₹18,500</div>
+          <div class="kyc-badge"><svg><use href="#ic-check"/></svg>Verified borrower</div>
+        </div>
+        <div class="card stat-card">
+          <h4>Profile completion</h4>
+          <div class="ring-wrap">
+            <svg width="76" height="76" viewBox="0 0 76 76">
+              <circle class="ring-track" cx="38" cy="38" r="32"/>
+              <circle class="ring-fill" id="profileRing" cx="38" cy="38" r="32" stroke-dasharray="201" stroke-dashoffset="201"/>
+            </svg>
+            <div><div class="ring-pct">85%</div><div class="ring-label">3 of 4 steps done</div></div>
+          </div>
+        </div>
+        <div class="card stat-card">
+          <h4>KYC status</h4>
+          <div class="stat-value" style="font-size:20px;color:var(--sage-dim)">Approved</div>
+          <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Verified on 28 Jun · valid across all requests</div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="card loan-card">
+          <div class="card-head">
+            <div><h4>Active loan · Course fee advance</h4><div class="amt mono">₹9,600 total</div></div>
+            <span class="status-pill active">Active</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" id="loanProgress" style="width:0%"></div></div>
+          <div class="progress-labels"><span>Paid: <span class="mono">₹4,800</span></span><span>Remaining: <span class="mono">₹4,800</span></span></div>
+          <div class="loan-meta">
+            <div><span>Next due</span><b>12 Aug</b></div>
+            <div><span>Next amount</span><b>₹2,400</b></div>
+            <div><span>Lender</span><b>Verified provider</b></div>
+          </div>
+        </div>
+
+        <div class="card repay-card tilt">
+          <div class="re-label">Repayment due</div>
+          <div class="re-amount">₹2,400</div>
+          <div class="re-due">Due in 15 days · 12 August</div>
+          <button class="repay-btn" onclick="switchSection('repay')">Repay now <svg class="icon"><use href="#ic-arrow"/></svg></button>
+        </div>
+      </section>
+
+      <section class="quick-actions">
+        <button class="qa-btn" onclick="switchSection('borrow')"><div class="qa-icon"><svg class="icon"><use href="#ic-wallet"/></svg></div><span>Raise a request</span></button>
+        <button class="qa-btn" onclick="switchSection('repay')"><div class="qa-icon"><svg class="icon"><use href="#ic-repeat"/></svg></div><span>Make a repayment</span></button>
+        <button class="qa-btn" onclick="switchSection('kyc')"><div class="qa-icon"><svg class="icon"><use href="#ic-shield"/></svg></div><span>Upload KYC doc</span></button>
+        <button class="qa-btn" onclick="switchSection('help')"><div class="qa-icon"><svg class="icon"><use href="#ic-help"/></svg></div><span>Contact support</span></button>
+      </section>
+
+      <section class="card activity-card">
+        <h4>Recent activity</h4>
+        <div class="activity-row good">
+          <div class="activity-ic"><svg><use href="#ic-check"/></svg></div>
+          <div class="activity-text"><div class="t1">KYC approved</div><div class="t2">28 Jun · 9:14 AM</div></div>
+        </div>
+        <div class="activity-row good">
+          <div class="activity-ic"><svg><use href="#ic-wallet"/></svg></div>
+          <div class="activity-text"><div class="t1">Request funded by a verified provider</div><div class="t2">30 Jun · 6:40 PM</div></div>
+          <div class="activity-amt">₹9,600</div>
+        </div>
+        <div class="activity-row">
+          <div class="activity-ic"><svg><use href="#ic-repeat"/></svg></div>
+          <div class="activity-text"><div class="t1">Repayment #1 completed</div><div class="t2">12 Jul · 11:02 AM</div></div>
+          <div class="activity-amt">₹2,400</div>
+        </div>
+        <div class="activity-row">
+          <div class="activity-ic"><svg><use href="#ic-user"/></svg></div>
+          <div class="activity-text"><div class="t1">Profile photo updated</div><div class="t2">6 Jul · 4:20 PM</div></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== ACCOUNT MANAGEMENT ===== -->
+    <section class="dash-section" id="sec-account">
+      <div class="card" style="margin-bottom:20px;">
+        <div class="profile-head">
+          <div class="avatar-lg">PS<button class="avatar-edit" title="Change photo"><svg class="icon" style="width:13px;height:13px;color:#fff;"><use href="#ic-camera"/></svg></button></div>
+          <div class="ph-info">
+            <h3>Priya Sharma <span class="verified-tag"><svg><use href="#ic-check"/></svg>Verified borrower</span></h3>
+            <div class="ph-meta">
+              <span><svg><use href="#ic-mail"/></svg>priya.sharma@nituni.edu.in</span>
+              <span><svg><use href="#ic-phone"/></svg>+91 98••••••10</span>
+              <span><svg><use href="#ic-id"/></svg>NIT Campus · ID #A2201458</span>
+            </div>
+          </div>
+          <div class="ph-actions"><button class="btn-outline">Change photo</button></div>
+        </div>
+      </div>
+
+      <div class="content-grid" style="grid-template-columns:1.3fr 1fr;">
+        <div class="card">
+          <h4 style="font-size:15px;">Personal details</h4>
+          <p style="font-size:12.3px;color:var(--ink-dim);margin-top:4px;">Your university email is locked once verified. Everything else can be updated anytime.</p>
+          <div class="form-grid" style="margin-top:6px;">
+            <div class="field"><label>FULL NAME</label><input type="text" value="Priya Sharma"></div>
+            <div class="field"><label>PHONE NUMBER</label><input type="tel" value="+91 98765 43210"></div>
+            <div class="field" style="grid-column:1/-1;"><label>UNIVERSITY EMAIL</label><input type="email" value="priya.sharma@nituni.edu.in" disabled style="opacity:.6;"></div>
+            <div class="field"><label>CAMPUS</label><input type="text" value="NIT Campus" disabled style="opacity:.6;"></div>
+            <div class="field"><label>STUDENT ID</label><input type="text" value="A2201458" disabled style="opacity:.6;"></div>
+          </div>
+          <button class="btn-dark" style="margin-top:20px;">Save changes</button>
+        </div>
+
+        <div class="card tilt">
+          <h4 style="font-size:15px;">Credit limit</h4>
+          <div class="stat-value" style="margin-top:10px;">₹18,500 <span class="unit">available</span></div>
+          <div class="progress-track"><div class="progress-fill" style="width:34%;background:linear-gradient(90deg,var(--blush-dim),var(--blush));"></div></div>
+          <div class="progress-labels"><span>Used: <span class="mono">₹9,600</span></span><span>Limit: <span class="mono">₹28,100</span></span></div>
+          <p style="font-size:11.6px;color:var(--ink-faint);margin-top:14px;line-height:1.6;">Set by the campus admin based on your KYC status &amp; repayment history. Repaying on time grows it over time.</p>
+        </div>
+      </div>
+
+      <div class="content-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="card">
+          <h4 style="font-size:15px;">Change password</h4>
+          <div class="field"><label>CURRENT PASSWORD</label><input type="password" placeholder="••••••••"></div>
+          <div class="field"><label>NEW PASSWORD</label><input type="password" placeholder="••••••••"></div>
+          <div class="field"><label>CONFIRM NEW PASSWORD</label><input type="password" placeholder="••••••••"></div>
+          <button class="btn-dark" style="margin-top:20px;">Update password</button>
+          <a class="forgot-link" href="#" style="display:block;margin-top:14px;">Forgot your current password?</a>
+        </div>
+        <div class="card">
+          <h4 style="font-size:15px;">ID card on file</h4>
+          <div style="display:flex;gap:14px;align-items:center;margin-top:14px;background:#f5f8fa;border-radius:12px;padding:14px;">
+            <div style="width:56px;height:40px;border-radius:8px;background:linear-gradient(135deg,var(--sidebar),#fff);display:flex;align-items:center;justify-content:center;flex:none;"><svg class="icon" style="color:var(--ink-faint);"><use href="#ic-id"/></svg></div>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:600;">student-id-card.jpg</div><div style="font-size:11.3px;color:var(--sage-dim);font-weight:600;margin-top:2px;">Verified</div></div>
+          </div>
+          <button class="btn-outline" style="margin-top:16px;">Re-upload ID card</button>
+          <p style="font-size:11.6px;color:var(--ink-faint);margin-top:12px;">Manage face verification, UPI &amp; agreements in the KYC &amp; Verification tab.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KYC & VERIFICATION ===== -->
+    <section class="dash-section" id="sec-kyc">
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+          <div>
+            <h4 style="font-size:15px;">Verification status</h4>
+            <p style="font-size:12.3px;color:var(--ink-dim);margin-top:4px;">All required checks are complete — approved on 28 Jun.</p>
+          </div>
+          <div class="kyc-badge" style="margin-top:0;"><svg><use href="#ic-check"/></svg>Approved</div>
+        </div>
+        <div class="kyc-progress" style="margin-top:26px;">
+          <div class="kyc-step done"><div class="ksn"><svg class="icon" style="width:14px;height:14px;"><use href="#ic-check"/></svg></div><div class="ksl">Email</div></div>
+          <div class="kyc-step done"><div class="ksn"><svg class="icon" style="width:14px;height:14px;"><use href="#ic-check"/></svg></div><div class="ksl">ID Card</div></div>
+          <div class="kyc-step done"><div class="ksn"><svg class="icon" style="width:14px;height:14px;"><use href="#ic-check"/></svg></div><div class="ksl">Camera</div></div>
+          <div class="kyc-step done"><div class="ksn"><svg class="icon" style="width:14px;height:14px;"><use href="#ic-check"/></svg></div><div class="ksl">Phone OTP</div></div>
+          <div class="kyc-step done"><div class="ksn"><svg class="icon" style="width:14px;height:14px;"><use href="#ic-check"/></svg></div><div class="ksl">UPI</div></div>
+          <div class="kyc-step done"><div class="ksn"><svg class="icon" style="width:14px;height:14px;"><use href="#ic-check"/></svg></div><div class="ksl">Agreement</div></div>
+        </div>
+      </div>
+
+      <div class="content-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="card">
+          <h4 style="font-size:15px;">Camera-based KYC</h4>
+          <div class="dropzone tilt" style="margin-top:14px;border-style:solid;background:linear-gradient(160deg,#eef4f8,#dbe7ee);">
+            <svg><use href="#ic-camera"/></svg>
+            <div class="dz-title">Live face verification</div>
+            <div class="dz-sub">Center your face and blink when prompted</div>
+          </div>
+          <div class="kyc-item done" style="padding-left:0;padding-right:0;">
+            <div class="kii"><svg class="icon"><use href="#ic-check"/></svg></div>
+            <div class="kit"><h5>Liveness check matched</h5><p>Captured 28 Jun · 9:02 AM</p></div>
+          </div>
+          <button class="btn-outline" style="margin-top:6px;">Re-verify face match</button>
+        </div>
+
+        <div class="card">
+          <h4 style="font-size:15px;">ID card verification</h4>
+          <div class="kyc-item done" style="padding-left:0;padding-right:0;margin-top:14px;">
+            <div class="kii"><svg class="icon"><use href="#ic-id"/></svg></div>
+            <div class="kit"><h5>student-id-card.jpg</h5><p>Matches profile name &amp; campus</p></div>
+            <div class="kis"><span class="status-pill approved">Verified</span></div>
+          </div>
+          <div class="dropzone" style="margin-top:10px;">
+            <svg><use href="#ic-upload"/></svg>
+            <div class="dz-title">Replace ID card</div>
+            <div class="dz-sub">JPG or PNG, under 5MB</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="card">
+          <h4 style="font-size:15px;">UPI &amp; phone verification</h4>
+          <div class="field"><label>UPI ID</label><input type="text" value="priya.sharma@okhdfc"></div>
+          <div class="kyc-item" style="padding-left:0;padding-right:0;">
+            <div class="kii good"><svg class="icon"><use href="#ic-check"/></svg></div>
+            <div class="kit"><h5>UPI linked &amp; verified</h5><p>Used for disbursal &amp; repayment</p></div>
+          </div>
+          <div class="field"><label>PHONE NUMBER</label><input type="tel" value="+91 98765 43210" disabled style="opacity:.6;"></div>
+          <div class="kyc-item" style="padding-left:0;padding-right:0;border-bottom:none;">
+            <div class="kii good"><svg class="icon"><use href="#ic-check"/></svg></div>
+            <div class="kit"><h5>OTP verified</h5><p>Number bound to this account</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4 style="font-size:15px;">Agreement &amp; guarantor</h4>
+          <div class="kyc-item" style="padding-left:0;padding-right:0;">
+            <div class="kii good"><svg class="icon"><use href="#ic-doc"/></svg></div>
+            <div class="kit"><h5>Master loan agreement e-signed</h5><p>Signed 28 Jun · covers all future requests</p></div>
+            <div class="kis"><button class="btn-outline" style="padding:8px 14px;font-size:12px;">View</button></div>
+          </div>
+          <div class="kyc-item" style="padding-left:0;padding-right:0;border-bottom:none;">
+            <div class="kii"><svg class="icon"><use href="#ic-users"/></svg></div>
+            <div class="kit"><h5>Guarantor <span style="font-weight:400;color:var(--ink-faint);">(optional)</span></h5><p>Add a co-signer to raise your credit limit</p></div>
+            <div class="kis"><button class="btn-outline" style="padding:8px 14px;font-size:12px;">Add</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BORROW REQUEST ===== -->
+    <section class="dash-section" id="sec-borrow">
+      <div class="card" style="margin-bottom:20px;">
+        <h4 style="font-size:15px;">Raise a new request</h4>
+        <p style="font-size:12.3px;color:var(--ink-dim);margin-top:4px;">You have <b class="mono" style="color:var(--ink);">₹18,500</b> of your credit limit available.</p>
+        <div class="form-grid" style="margin-top:6px;">
+          <div class="field"><label>AMOUNT NEEDED</label><input type="number" placeholder="₹ 5,000"></div>
+          <div class="field"><label>PURPOSE</label>
+            <select>
+              <option>Course fee</option><option>Hostel / rent</option><option>Medical</option><option>Gadget / device</option><option>Travel</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field" style="grid-column:1/-1;"><label>REASON / DESCRIPTION</label><textarea placeholder="Briefly describe what this is for — providers see this before approving."></textarea></div>
+          <div class="field"><label>REPAYMENT PLAN</label>
+            <select><option>Single payment · 30 days</option><option>2 instalments · 60 days</option><option>3 instalments · 90 days</option></select>
+          </div>
+          <div class="field">
+            <label>OPEN TO ANY VERIFIED PROVIDER</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+              <div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div>
+              <span style="font-size:12.3px;color:var(--ink-dim);">Recommended — gets funded faster</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-dark" style="margin-top:20px;" onclick="showToast('Request submitted — providers will be notified.')">Submit request</button>
+      </div>
+
+      <div class="sec-head"><h2>My requests</h2></div>
+      <div class="seg-tabs">
+        <button class="seg-tab active" onclick="filterReq(this,'all')">All</button>
+        <button class="seg-tab" onclick="filterReq(this,'pending')">Pending</button>
+        <button class="seg-tab" onclick="filterReq(this,'approved')">Approved / Active</button>
+        <button class="seg-tab" onclick="filterReq(this,'completed')">Completed</button>
+      </div>
+
+      <div class="card req-status-card" data-status="approved" style="margin-bottom:14px;">
+        <div class="req-card">
+          <div class="req-icon"><svg class="icon"><use href="#ic-wallet"/></svg></div>
+          <div class="req-info"><h5>Course fee advance</h5><div class="rmeta">Raised 30 Jun · 60-day plan · funded by a verified provider</div></div>
+          <div class="req-amt">₹9,600</div>
+          <span class="status-pill approved" style="margin-left:14px;">Active</span>
+        </div>
+      </div>
+      <div class="card req-status-card" data-status="pending" style="margin-bottom:14px;">
+        <div class="req-card">
+          <div class="req-icon"><svg class="icon"><use href="#ic-clock"/></svg></div>
+          <div class="req-info"><h5>Hostel rent — July</h5><div class="rmeta">Raised 24 Jul · awaiting a provider match</div></div>
+          <div class="req-amt">₹4,000</div>
+          <span class="status-pill pending" style="margin-left:14px;">Pending</span>
+        </div>
+      </div>
+      <div class="card req-status-card" data-status="completed" style="margin-bottom:14px;">
+        <div class="req-card">
+          <div class="req-icon"><svg class="icon"><use href="#ic-check"/></svg></div>
+          <div class="req-info"><h5>Textbook &amp; supplies</h5><div class="rmeta">Raised 2 Apr · fully repaid 15 May</div></div>
+          <div class="req-amt">₹1,800</div>
+          <span class="status-pill completed" style="margin-left:14px;">Completed</span>
+        </div>
+      </div>
+      <div class="card req-status-card" data-status="completed">
+        <div class="req-card">
+          <div class="req-icon"><svg class="icon"><use href="#ic-alert"/></svg></div>
+          <div class="req-info"><h5>Weekend trip advance</h5><div class="rmeta">Raised 10 Mar · declined — exceeded monthly limit</div></div>
+          <div class="req-amt">₹3,500</div>
+          <span class="status-pill rejected" style="margin-left:14px;">Rejected</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== REPAYMENT CENTER ===== -->
+    <section class="dash-section" id="sec-repay">
+      <section class="stat-row">
+        <div class="card stat-card"><h4>Total outstanding</h4><div class="stat-value">₹4,800</div></div>
+        <div class="card stat-card"><h4>Next payment due</h4><div class="stat-value" style="font-size:20px;">₹2,400 <span style="font-size:12px;color:var(--ink-faint);font-family:'Inter';">· 12 Aug</span></div></div>
+        <div class="card stat-card"><h4>Total repaid to date</h4><div class="stat-value">₹6,600</div></div>
+      </section>
+
+      <div class="content-grid" style="grid-template-columns:1.4fr 1fr;">
+        <div class="card">
+          <h4 style="font-size:15px;">Course fee advance — repayment schedule</h4>
+          <div class="sched-table" style="margin-top:14px;">
+            <div class="sched-row head"><span>#</span><span>Due date</span><span>Amount</span><span>Status</span><span></span></div>
+            <div class="sched-row"><span class="sched-n">1</span><span>12 Jul</span><span class="sched-amt">₹4,800</span><span><span class="status-pill paid">Paid</span></span><span></span></div>
+            <div class="sched-row"><span class="sched-n">2</span><span>12 Aug</span><span class="sched-amt">₹2,400</span><span><span class="status-pill pending">Due soon</span></span><span><button class="pay-mini-btn" onclick="showToast('Redirecting to UPI for ₹2,400…')">Pay</button></span></div>
+            <div class="sched-row"><span class="sched-n">3</span><span>12 Sep</span><span class="sched-amt">₹2,400</span><span><span class="status-pill upcoming">Upcoming</span></span><span></span></div>
+          </div>
+        </div>
+        <div class="card repay-card tilt">
+          <div class="re-label">Repayment due</div>
+          <div class="re-amount">₹2,400</div>
+          <div class="re-due">Due in 15 days · 12 August</div>
+          <button class="repay-btn" onclick="showToast('Redirecting to UPI for ₹2,400…')">Repay now <svg class="icon"><use href="#ic-arrow"/></svg></button>
+          <p style="font-size:11.3px;color:var(--ink-faint);margin-top:14px;">Partial payments are accepted — pay any amount up to the total outstanding.</p>
+        </div>
+      </div>
+
+      <div class="card activity-card">
+        <h4>Payment history</h4>
+        <div class="activity-row good">
+          <div class="activity-ic"><svg><use href="#ic-check"/></svg></div>
+          <div class="activity-text"><div class="t1">Instalment #1 paid via UPI</div><div class="t2">12 Jul · Ref #UPI2907114</div></div>
+          <div class="activity-amt">₹4,800</div>
+          <button class="receipt-btn" title="Download receipt"><svg class="icon" style="width:14px;height:14px;color:var(--ink-faint);"><use href="#ic-download"/></svg></button>
+        </div>
+        <div class="activity-row good">
+          <div class="activity-ic"><svg><use href="#ic-check"/></svg></div>
+          <div class="activity-text"><div class="t1">Textbook loan fully repaid</div><div class="t2">15 May · Ref #UPI1105092</div></div>
+          <div class="activity-amt">₹1,800</div>
+          <button class="receipt-btn" title="Download receipt"><svg class="icon" style="width:14px;height:14px;color:var(--ink-faint);"><use href="#ic-download"/></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== NOTIFICATIONS ===== -->
+    <section class="dash-section" id="sec-notifications">
+      <div class="card">
+        <div class="seg-tabs" style="margin-bottom:4px;">
+          <button class="seg-tab active">All</button>
+          <button class="seg-tab">Unread</button>
+        </div>
+        <div class="notif-row unread"><div class="notif-ic warn"><svg><use href="#ic-bell"/></svg></div><div class="notif-text"><div class="n1">Repayment of ₹2,400 due in 15 days</div><div class="n2">Today · 8:00 AM</div></div></div>
+        <div class="notif-row unread"><div class="notif-ic good"><svg><use href="#ic-check"/></svg></div><div class="notif-text"><div class="n1">Your request "Hostel rent — July" was received</div><div class="n2">24 Jul · 6:12 PM</div></div></div>
+        <div class="notif-row"><div class="notif-ic good"><svg><use href="#ic-wallet"/></svg></div><div class="notif-text"><div class="n1">Course fee advance funded by a verified provider</div><div class="n2">30 Jun · 6:40 PM</div></div></div>
+        <div class="notif-row"><div class="notif-ic good"><svg><use href="#ic-check"/></svg></div><div class="notif-text"><div class="n1">KYC approved — you're fully verified</div><div class="n2">28 Jun · 9:14 AM</div></div></div>
+        <div class="notif-row"><div class="notif-ic"><svg><use href="#ic-user"/></svg></div><div class="notif-text"><div class="n1">Profile photo updated</div><div class="n2">6 Jul · 4:20 PM</div></div></div>
+      </div>
+    </section>
+
+    <!-- ===== HELP & SUPPORT ===== -->
+    <section class="dash-section" id="sec-help">
+      <div class="support-grid" style="margin-bottom:20px;">
+        <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-help"/></svg></div><h5>Browse FAQs</h5><p>Answers to common questions about requests &amp; repayments.</p></div>
+        <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-mail"/></svg></div><h5>Email support</h5><p>support@unifi.campus · replies within a day</p><button class="btn-outline">Email us</button></div>
+        <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-alert"/></svg></div><h5>Raise a dispute</h5><p>Repayment not reflecting? Get an admin to step in.</p></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h4 style="font-size:15px;">Frequently asked</h4>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">How is my credit limit decided?<svg class="icon"><use href="#ic-chevron"/></svg></div>
+          <div class="faq-a">Your limit is set by the campus admin based on your KYC status, verified profile and repayment history. It grows as you repay on time.</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">What happens if I miss a repayment?<svg class="icon"><use href="#ic-chevron"/></svg></div>
+          <div class="faq-a">You'll get reminders before every due date. Missed payments are flagged to the admin and may reduce your credit limit for future requests.</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">Can I repay before the due date?<svg class="icon"><use href="#ic-chevron"/></svg></div>
+          <div class="faq-a">Yes — you can make a full or partial repayment any time from the Repayment Center.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 style="font-size:15px;">Raise a support ticket</h4>
+        <div class="form-grid" style="margin-top:6px;">
+          <div class="field"><label>CATEGORY</label><select><option>Repayment issue</option><option>KYC issue</option><option>Request not funded</option><option>Other</option></select></div>
+          <div class="field"><label>SUBJECT</label><input type="text" placeholder="Short summary"></div>
+          <div class="field" style="grid-column:1/-1;"><label>DESCRIBE THE ISSUE</label><textarea placeholder="Add as much detail as you can…"></textarea></div>
+        </div>
+        <button class="btn-dark" style="margin-top:16px;" onclick="showToast('Ticket submitted — support will reach out by email.')">Submit ticket <svg class="icon" style="width:15px;height:15px;"><use href="#ic-send"/></svg></button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <a class="bn-item active" data-sec="overview" onclick="switchSection('overview')"><svg><use href="#ic-home"/></svg>Home</a>
+    <a class="bn-item" data-sec="borrow" onclick="switchSection('borrow')"><svg><use href="#ic-wallet"/></svg>Requests</a>
+    <a class="bn-item" data-sec="repay" onclick="switchSection('repay')"><svg><use href="#ic-repeat"/></svg>Repay</a>
+    <a class="bn-item" data-sec="notifications" onclick="switchSection('notifications')"><svg><use href="#ic-bell"/></svg>Alerts</a>
+    <a class="bn-item" onclick="toggleSidebar()"><svg><use href="#ic-user"/></svg>More</a>
+  </nav>
+</div>
+
+<div class="toast" id="toast" style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--base);padding:14px 22px;border-radius:100px;font-size:13.5px;font-weight:500;box-shadow:0 20px 45px -20px rgba(31,41,55,.5);z-index:999;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;display:flex;align-items:center;gap:9px;">
+  <svg style="width:16px;height:16px;color:var(--sage);"><use href="#ic-check"/></svg><span id="toastMsg"></span>
+</div>
+
+<script>
+const topbarMap = {
+  overview: ['Good afternoon, Priya', 'Tuesday, 28 July'],
+  account: ['Account Management', 'Manage your profile, contact details & security'],
+  kyc: ['KYC & Verification', 'Camera verification, ID card, UPI & agreements'],
+  borrow: ['Borrow Request', 'Raise new requests, track pending & approved loans'],
+  repay: ['Repayment Center', 'Your schedule, dues & payment history'],
+  notifications: ['Notifications', 'Recent updates on your account'],
+  help: ['Help & Support', 'FAQs, contact & raise a ticket']
+};
+
+function switchSection(name){
+  document.querySelectorAll('.dash-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.sec===name));
+  document.querySelectorAll('.bn-item').forEach(n=>n.classList.toggle('active', n.dataset.sec===name));
+  const t = topbarMap[name];
+  document.getElementById('topTitle').textContent = t[0];
+  document.getElementById('topSub').textContent = t[1];
+  document.getElementById('sidebar').classList.remove('open');
+  document.querySelector('.dash-main').scrollTo(0,0);
+  window.scrollTo(0,0);
+}
+
+function filterReq(btn, status){
+  document.querySelectorAll('#sec-borrow .seg-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#sec-borrow .req-status-card').forEach(c=>{
+    c.style.display = (status==='all' || c.dataset.status===status) ? '' : 'none';
+  });
+}
+
+function doLogin(){
+  const btn = document.getElementById('loginBtn');
+  btn.innerHTML = 'Logging in…';
+  setTimeout(() => {
+    document.getElementById('screen-login').classList.remove('active');
+    document.getElementById('screen-dashboard').classList.add('active');
+    switchSection('overview');
+    animateDashboard();
+  }, 550);
+}
+function doLogout(){
+  document.getElementById('screen-dashboard').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  document.getElementById('sidebar').classList.remove('open');
+}
+function togglePw(){
+  const input = document.getElementById('pwInput');
+  const btn = document.querySelector('.pw-toggle');
+  if(input.type === 'password'){ input.type='text'; btn.textContent='HIDE'; }
+  else { input.type='password'; btn.textContent='SHOW'; }
+}
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+}
+function animateDashboard(){
+  requestAnimationFrame(() => {
+    document.getElementById('profileRing').style.strokeDashoffset = 30;
+    document.getElementById('loanProgress').style.width = '50%';
+  });
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>{
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 3200);
+}
+
+/* subtle 3D tilt on hero-style cards */
+document.querySelectorAll('.tilt').forEach(card=>{
+  card.addEventListener('mousemove', e=>{
+    const r = card.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const rx = ((y / r.height) - 0.5) * -6;
+    const ry = ((x / r.width) - 0.5) * 6;
+    card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-2px)`;
+  });
+  card.addEventListener('mouseleave', ()=>{ card.style.transform = ''; });
+});
+</script>
+</body>
+</html>

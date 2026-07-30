@@ -3,6 +3,9 @@ import AppShell from '../components/AppShell'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { openRazorpayCheckout } from '../lib/razorpay'
+import LoanWizardModal from '../components/LoanWizardModal'
+import MultiDocumentKycModal from '../components/MultiDocumentKycModal'
+import LoanDetailsModal from '../components/LoanDetailsModal'
 
 const sections = [
   { key: 'overview', label: 'Dashboard' },
@@ -37,6 +40,10 @@ export default function BorrowerPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+
+  const [isWizardOpen, setIsWizardOpen] = useState(false)
+  const [isKycOpen, setIsKycOpen] = useState(false)
+  const [selectedLoan, setSelectedLoan] = useState(null)
 
   const [dashboard, setDashboard] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -543,19 +550,52 @@ export default function BorrowerPanel() {
             </article>
 
             <form className="portal-panel-card form" onSubmit={linkUpi}>
-              <h3>UPI Setup</h3>
+              <h3>UPI Setup & KYC Verification</h3>
               <p>Current UPI: {currentUpi || 'Not linked'}</p>
               <label>
                 New UPI ID
                 <input value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="name@upi" required />
               </label>
-              <button className="btn btn-primary" type="submit">
-                Save UPI
-              </button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button className="btn btn-primary" type="submit" style={{ flex: 1 }}>
+                  Save UPI
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setIsKycOpen(true)}
+                  style={{ flex: 1, borderColor: '#00d09c', color: '#00d09c' }}
+                >
+                  🆔 Multi-Doc KYC
+                </button>
+              </div>
             </form>
           </div>
         </section>
       )}
+
+      <LoanWizardModal
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        accessToken={accessToken}
+        onSuccess={reload}
+      />
+
+      <MultiDocumentKycModal
+        isOpen={isKycOpen}
+        onClose={() => setIsKycOpen(false)}
+        accessToken={accessToken}
+        currentKyc={profile}
+        onSuccess={reload}
+      />
+
+      <LoanDetailsModal
+        isOpen={Boolean(selectedLoan)}
+        onClose={() => setSelectedLoan(null)}
+        loan={selectedLoan}
+        accessToken={accessToken}
+        isProvider={false}
+      />
     </AppShell>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import AppShell from '../components/AppShell'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
+import UniversityHoldNoticeModal from '../components/UniversityHoldNoticeModal'
 
 const money = (n = 0) => `INR ${Number(n).toLocaleString('en-IN')}`
 const dateLabel = (value) => (value ? new Date(value).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'N/A')
@@ -38,6 +39,8 @@ export default function AdminPanel() {
   const [loans, setLoans] = useState([])
   const [admins, setAdmins] = useState([])
   const [configDraft, setConfigDraft] = useState(null)
+
+  const [holdNoticeLoan, setHoldNoticeLoan] = useState(null)
 
   const [newAdmin, setNewAdmin] = useState({
     email: '',
@@ -664,6 +667,12 @@ export default function AdminPanel() {
           </div>
         </section>
       )}
+
+      <UniversityHoldNoticeModal
+        isOpen={Boolean(holdNoticeLoan)}
+        onClose={() => setHoldNoticeLoan(null)}
+        loan={holdNoticeLoan}
+      />
     </AppShell>
   )
 }

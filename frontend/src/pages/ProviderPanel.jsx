@@ -3,6 +3,7 @@ import AppShell from "../components/AppShell";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { openRazorpayCheckout } from "../lib/razorpay";
+import LoanDetailsModal from "../components/LoanDetailsModal";
 
 const sections = [
   { key: "overview", label: "Dashboard" },
@@ -37,6 +38,8 @@ export default function ProviderPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const [inspectingLoan, setInspectingLoan] = useState(null);
 
   const [dashboard, setDashboard] = useState(null);
   const [marketplace, setMarketplace] = useState([]);
@@ -544,6 +547,15 @@ export default function ProviderPanel() {
           </div>
         </section>
       )}
+
+      <LoanDetailsModal
+        isOpen={Boolean(inspectingLoan)}
+        onClose={() => setInspectingLoan(null)}
+        loan={inspectingLoan}
+        accessToken={accessToken}
+        isProvider={true}
+        onFundSuccess={reload}
+      />
     </AppShell>
   );
 }
