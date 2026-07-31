@@ -62,13 +62,6 @@ import ProviderPanel from './pages/ProviderPanel'
 import AdminPanel from './pages/AdminPanel'
 import NotFoundPage from './pages/NotFoundPage'
 
-// ── Section manifests ────────────────────────────────────────────────────────
-// These are the canonical URL segments. The matching panel reads :section via
-// useParams() and renders the correct content block.
-const BORROWER_SECTIONS = ['overview', 'account', 'kyc', 'borrow', 'repay', 'notifications', 'help']
-const PROVIDER_SECTIONS = ['overview', 'account', 'kyc', 'provide', 'balance', 'notifications', 'help']
-const ADMIN_SECTIONS    = ['overview', 'accounts', 'kyc', 'loans', 'defaults', 'disputes', 'policy', 'audit']
-
 // ── Role → home route map ────────────────────────────────────────────────────
 export const ROLE_HOME = {
   BORROWER:      '/borrower/overview',
@@ -96,15 +89,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* /borrower → /borrower/overview */}
         <Route index element={<Navigate to="overview" replace />} />
-
-        {/* /borrower/:section — panel reads :section from useParams() */}
-        {BORROWER_SECTIONS.map((sec) => (
-          <Route key={sec} path={sec} element={null} />
-        ))}
-
-        {/* Unknown sub-path → safe fallback */}
+        <Route path=":section" element={null} />
         <Route path="*" element={<Navigate to="overview" replace />} />
       </Route>
 
@@ -118,9 +104,7 @@ export default function App() {
         }
       >
         <Route index element={<Navigate to="overview" replace />} />
-        {PROVIDER_SECTIONS.map((sec) => (
-          <Route key={sec} path={sec} element={null} />
-        ))}
+        <Route path=":section" element={null} />
         <Route path="*" element={<Navigate to="overview" replace />} />
       </Route>
 
@@ -134,9 +118,7 @@ export default function App() {
         }
       >
         <Route index element={<Navigate to="overview" replace />} />
-        {ADMIN_SECTIONS.map((sec) => (
-          <Route key={sec} path={sec} element={null} />
-        ))}
+        <Route path=":section" element={null} />
         <Route path="*" element={<Navigate to="overview" replace />} />
       </Route>
 
