@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import AppShell from '../components/AppShell'
+import KycCameraModal from '../components/KycCameraModal'
+import MultiDocumentKycModal from '../components/MultiDocumentKycModal'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { openRazorpayCheckout } from '../lib/razorpay'
@@ -100,6 +102,27 @@ export default function ProviderPanel() {
   // Wallet
   const [walletForm, setWalletForm] = useState({ amount: 5000, action: 'DEPOSIT' })
   const [withdrawAmount, setWithdrawAmount] = useState(5000)
+
+  // KYC & Camera Modals
+  const [cameraModalOpen, setCameraModalOpen] = useState(false)
+  const [kycModalOpen, setKycModalOpen] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleIdCardUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setMessage('')
+    try {
+      const payload = new FormData()
+      payload.append('idCard', file)
+      await api.post('/users/kyc/id-card', payload, accessToken, true)
+      setMessage('✓ Student ID card uploaded & saved to database!')
+      await reload()
+    } catch (err) {
+      setError(err.message || 'Failed to upload ID card')
+    }
+  }
 
   // Help
   const [openFaq, setOpenFaq] = useState(null)
@@ -492,13 +515,33 @@ export default function ProviderPanel() {
             </div>
           </div>
 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleIdCardUpload}
+            accept="image/*,.pdf"
+            style={{ display: 'none' }}
+          />
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
+            {/* Camera KYC Card */}
             <div style={card()}>
               <h4 style={{ fontSize: 15 }}>Camera-based KYC</h4>
-              <div style={{ border: `2px solid rgba(31,41,55,.14)`, borderRadius: 16, padding: 22, textAlign: 'center', background: 'linear-gradient(160deg,#eef4f8,#dbe7ee)', marginTop: 14 }}>
+              <div
+                onClick={() => setCameraModalOpen(true)}
+                style={{
+                  border: `2px dashed var(--accent-border, rgba(0, 208, 156, 0.35))`,
+                  borderRadius: 16,
+                  padding: 22,
+                  textAlign: 'center',
+                  background: 'var(--input-bg, rgba(255,255,255,0.03))',
+                  marginTop: 14,
+                  cursor: 'pointer',
+                }}
+              >
                 <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>Live face verification</div>
-                <div style={{ fontSize: 11.2, color: '#94a3ae', marginTop: 4 }}>Center your face and blink when prompted</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--card-title, #fff)' }}>Live webcam face verification</div>
+                <div style={{ fontSize: 11.2, color: 'var(--card-muted, #94a3ae)', marginTop: 4 }}>Click to open webcam and capture face match</div>
               </div>
               <div style={{ ...kycItem, paddingLeft: 0, paddingRight: 0 }}>
                 <div style={kii(profile?.kycStatus === 'APPROVED')}>{profile?.kycStatus === 'APPROVED' ? '✓' : '○'}</div>
@@ -506,31 +549,41 @@ export default function ProviderPanel() {
                   <div style={{ fontWeight: 700, fontSize: 13.8 }}>Liveness check {profile?.kycStatus === 'APPROVED' ? 'matched' : 'pending'}</div>
                 </div>
               </div>
-              <button style={{ ...outlineBtn, marginTop: 6 }}>Re-verify face match</button>
+              <button type="button" onClick={() => setCameraModalOpen(true)} style={{ ...darkBtn, marginTop: 6, width: '100%', justifyContent: 'center' }}>
+                📷 Open Camera / Re-verify Face Match
+              </button>
             </div>
 
+            {/* ID Card Verification Card */}
             <div style={card()}>
               <h4 style={{ fontSize: 15 }}>ID card verification</h4>
               <div style={{ ...kycItem, paddingLeft: 0, paddingRight: 0, marginTop: 14 }}>
                 <div style={kii(!!profile?.collegeIdNum)}>🆔</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 13.8 }}>{profile?.collegeIdNum ? 'ID card verified' : 'No ID uploaded'}</div>
+                  {profile?.collegeIdNum && <div style={{ fontSize: 11.5, color: 'var(--card-muted)' }}>Roll #: {profile.collegeIdNum}</div>}
                 </div>
                 <span style={pill(profile?.collegeIdNum ? 'approved' : 'pending')}>{profile?.collegeIdNum ? 'Verified' : 'Pending'}</span>
               </div>
-              <div style={{ border: '2px dashed rgba(31,41,55,.14)', borderRadius: 16, padding: 22, textAlign: 'center', background: '#f7fafc', marginTop: 10 }}>
-                <div style={{ fontSize: 24, color: '#94a3ae', marginBottom: 8 }}>⬆️</div>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>Upload / Replace ID card</div>
-                <div style={{ fontSize: 11.2, color: '#94a3ae', marginTop: 4 }}>JPG or PNG, under 5MB</div>
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  border: '2px dashed var(--accent-border, rgba(201, 168, 76, 0.35))',
+                  borderRadius: 16,
+                  padding: 22,
+                  textAlign: 'center',
+                  background: 'var(--input-bg, rgba(255,255,255,0.03))',
+                  marginTop: 10,
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 24, color: 'var(--gold, #c9a84c)', marginBottom: 8 }}>⬆️</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--card-title, #fff)' }}>Upload / Replace ID Card File</div>
+                <div style={{ fontSize: 11.2, color: 'var(--card-muted, #94a3ae)', marginTop: 4 }}>Click to choose JPG, PNG, or PDF file</div>
               </div>
-              <div style={{ ...kycItem, paddingLeft: 0, paddingRight: 0, borderBottom: 'none' }}>
-                <div style={kii(!!profile?.panNum)}>📋</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.8 }}>PAN / Govt. ID</div>
-                  <div style={{ fontSize: 11.8, color: '#64748b', marginTop: 3 }}>Required for earnings above ₹40,000/yr</div>
-                </div>
-                <span style={pill(profile?.panNum ? 'approved' : 'pending')}>{profile?.panNum ? 'Done' : 'Pending'}</span>
-              </div>
+              <button type="button" onClick={() => setKycModalOpen(true)} style={{ ...outlineBtn, marginTop: 14, width: '100%' }}>
+                📋 Open Full Multi-Doc KYC Stepper
+              </button>
             </div>
           </div>
 
@@ -900,6 +953,20 @@ export default function ProviderPanel() {
           </form>
         </section>
       )}
+      {/* KYC Camera & Stepper Modals */}
+      <KycCameraModal
+        isOpen={cameraModalOpen}
+        onClose={() => setCameraModalOpen(false)}
+        accessToken={accessToken}
+        onSuccess={reload}
+      />
+      <MultiDocumentKycModal
+        isOpen={kycModalOpen}
+        onClose={() => setKycModalOpen(false)}
+        accessToken={accessToken}
+        currentKyc={profile}
+        onSuccess={reload}
+      />
     </AppShell>
   )
 }
