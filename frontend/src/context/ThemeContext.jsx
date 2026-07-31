@@ -10,9 +10,9 @@ const readPreference = () => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved === 'dark' || saved === 'light' || saved === 'system') return saved
   } catch {
-    return 'light'
+    return 'dark'
   }
-  return 'light'
+  return 'dark'
 }
 
 export function ThemeProvider({ children }) {

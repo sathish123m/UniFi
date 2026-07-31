@@ -32,10 +32,12 @@ const pillClass = (s = '') => {
 // Inline styles for the admin theme
 const S = {
   card: {
-    background: '#fff',
+    background: 'var(--card-bg, rgba(18, 22, 32, 0.85))',
+    border: '1px solid var(--card-border, rgba(255, 255, 255, 0.09))',
+    color: 'var(--card-text, #f3f3fa)',
     borderRadius: 20,
     padding: 24,
-    boxShadow: '0 20px 40px -26px rgba(31,41,55,.22)',
+    boxShadow: 'var(--card-shadow, 0 20px 40px -26px rgba(0,0,0,.5))',
     marginBottom: 16,
     position: 'relative',
     overflow: 'hidden',
@@ -47,16 +49,18 @@ const S = {
     marginBottom: 20,
   },
   statCard: {
-    background: '#fff',
+    background: 'var(--card-bg, rgba(18, 22, 32, 0.85))',
+    border: '1px solid var(--card-border, rgba(255, 255, 255, 0.09))',
+    color: 'var(--card-text, #f3f3fa)',
     borderRadius: 20,
     padding: 22,
-    boxShadow: '0 20px 40px -26px rgba(31,41,55,.22)',
+    boxShadow: 'var(--card-shadow, 0 20px 40px -26px rgba(0,0,0,.5))',
   },
-  statLabel: { fontSize: 12, color: '#64748b', fontWeight: 500 },
-  statValue: { fontFamily: 'IBM Plex Mono, monospace', fontSize: 26, fontWeight: 700, marginTop: 8, color: '#1f2937' },
+  statLabel: { fontSize: 12, color: 'var(--card-muted, #94a3ae)', fontWeight: 500 },
+  statValue: { fontFamily: 'IBM Plex Mono, monospace', fontSize: 26, fontWeight: 700, marginTop: 8, color: 'var(--card-title, #ffffff)' },
   grid2: { display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 18, marginBottom: 20 },
   secHead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', margin: '6px 0 16px', flexWrap: 'wrap', gap: 12 },
-  acctRow: { display: 'flex', alignItems: 'center', gap: 14, padding: '15px 4px', borderBottom: '1px solid rgba(31,41,55,.08)', flexWrap: 'wrap' },
+  acctRow: { display: 'flex', alignItems: 'center', gap: 14, padding: '15px 4px', borderBottom: '1px solid var(--row-border, rgba(255,255,255,0.08))', flexWrap: 'wrap' },
   acctAvatar: { width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#8fbfa3,#e8a99b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, color: '#fff', flexShrink: 0 },
   pill: (type) => ({
     fontFamily: 'IBM Plex Mono, monospace',

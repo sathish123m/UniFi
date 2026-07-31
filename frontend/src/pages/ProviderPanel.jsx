@@ -21,10 +21,12 @@ const dateLabel = (v) =>
 const cap = (s = '') => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 
 const card = (extra = {}) => ({
-  background: '#fff',
+  background: 'var(--card-bg, rgba(18, 22, 32, 0.85))',
+  border: '1px solid var(--card-border, rgba(255, 255, 255, 0.09))',
+  color: 'var(--card-text, #f3f3fa)',
   borderRadius: 20,
   padding: 24,
-  boxShadow: '0 20px 40px -26px rgba(31,41,55,.22)',
+  boxShadow: 'var(--card-shadow, 0 20px 40px -26px rgba(0,0,0,.5))',
   marginBottom: 16,
   position: 'relative',
   overflow: 'hidden',
@@ -37,26 +39,26 @@ const pill = (type) => {
     active: { background: 'rgba(143,191,163,.22)', color: '#6fa98f' },
     funded: { background: 'rgba(143,191,163,.22)', color: '#6fa98f' },
     approved: { background: 'rgba(143,191,163,.22)', color: '#6fa98f' },
-    pending: { background: 'rgba(224,177,104,.2)', color: '#96712c' },
-    rejected: { background: 'rgba(232,169,155,.32)', color: '#a13f2c' },
-    completed: { background: 'rgba(31,41,55,.08)', color: '#64748b' },
-    repaid: { background: 'rgba(31,41,55,.08)', color: '#64748b' },
-    overdue: { background: 'rgba(232,169,155,.32)', color: '#a13f2c' },
+    pending: { background: 'rgba(224,177,104,.2)', color: 'var(--gold, #c9a84c)' },
+    rejected: { background: 'rgba(232,169,155,.32)', color: '#ff6b6b' },
+    completed: { background: 'rgba(255,255,255,.08)', color: 'var(--card-muted, #94a3b8)' },
+    repaid: { background: 'rgba(255,255,255,.08)', color: 'var(--card-muted, #94a3b8)' },
+    overdue: { background: 'rgba(232,169,155,.32)', color: '#ff6b6b' },
     good: { background: 'rgba(143,191,163,.22)', color: '#6fa98f' },
-    warn: { background: 'rgba(224,177,104,.2)', color: '#96712c' },
+    warn: { background: 'rgba(224,177,104,.2)', color: 'var(--gold, #c9a84c)' },
   }
   return { ...base, ...(map[type] || map.pending) }
 }
 
-const fieldLabel = { fontSize: 11.5, color: '#94a3ae', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '.04em', display: 'block', marginBottom: 6, marginTop: 16 }
-const inputStyle = { width: '100%', padding: '13px 16px', borderRadius: 12, background: '#f5f8fa', border: '1.5px solid rgba(31,41,55,.08)', color: '#1f2937', fontSize: 14.5, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', outline: 'none' }
-const darkBtn = { padding: '13px 24px', borderRadius: 12, background: '#1f2937', color: '#fdf3ef', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }
-const outlineBtn = { padding: '10px 18px', borderRadius: 12, border: '1.5px solid rgba(31,41,55,.14)', fontWeight: 700, fontSize: 13, color: '#1f2937', background: 'transparent', cursor: 'pointer' }
-const segTab = (active) => ({ padding: '9px 18px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, color: active ? '#fdf3ef' : '#64748b', background: active ? '#1f2937' : 'rgba(31,41,55,.05)', border: 'none', cursor: 'pointer' })
-const actRow = { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 0', borderBottom: '1px solid rgba(31,41,55,.08)' }
-const actIc = (good) => ({ width: 34, height: 34, borderRadius: 10, background: good ? 'rgba(143,191,163,.18)' : 'rgba(31,41,55,.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, color: good ? '#6fa98f' : '#64748b' })
-const kycItem = { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid rgba(31,41,55,.08)' }
-const kii = (done) => ({ width: 40, height: 40, borderRadius: 12, background: done ? 'rgba(143,191,163,.2)' : 'rgba(31,41,55,.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: done ? '#6fa98f' : '#64748b', fontSize: 16 })
+const fieldLabel = { fontSize: 11.5, color: 'var(--card-muted, #94a3ae)', fontFamily: 'IBM Plex Mono, monospace', letterSpacing: '.04em', display: 'block', marginBottom: 6, marginTop: 16 }
+const inputStyle = { width: '100%', padding: '13px 16px', borderRadius: 12, background: 'var(--input-bg, rgba(255,255,255,0.05))', border: '1.5px solid var(--input-border, rgba(255,255,255,0.12))', color: 'var(--input-text, #f3f3fa)', fontSize: 14.5, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', outline: 'none' }
+const darkBtn = { padding: '13px 24px', borderRadius: 12, background: 'var(--btn-dark-bg, #c9a84c)', color: 'var(--btn-dark-text, #090909)', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }
+const outlineBtn = { padding: '10px 18px', borderRadius: 12, border: '1.5px solid var(--btn-outline-border, rgba(255,255,255,0.2))', fontWeight: 700, fontSize: 13, color: 'var(--btn-outline-text, #f3f3fa)', background: 'transparent', cursor: 'pointer' }
+const segTab = (active) => ({ padding: '9px 18px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, color: active ? 'var(--btn-dark-text, #090909)' : 'var(--card-muted, #94a3b8)', background: active ? 'var(--btn-dark-bg, #c9a84c)' : 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer' })
+const actRow = { display: 'flex', alignItems: 'center', gap: 13, padding: '13px 0', borderBottom: '1px solid var(--row-border, rgba(255,255,255,0.08))' }
+const actIc = (good) => ({ width: 34, height: 34, borderRadius: 10, background: good ? 'rgba(143,191,163,.18)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14, color: good ? '#6fa98f' : 'var(--card-muted, #94a3b8)' })
+const kycItem = { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: '1px solid var(--row-border, rgba(255,255,255,0.08))' }
+const kii = (done) => ({ width: 40, height: 40, borderRadius: 12, background: done ? 'rgba(143,191,163,.2)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: done ? '#6fa98f' : 'var(--card-muted, #94a3b8)', fontSize: 16 })
 
 const FAQS = [
   { q: 'How is interest calculated on my funded loans?', a: 'Interest is fixed at the time you accept a request. If the borrower repays early, interest is prorated automatically.' },
@@ -315,14 +317,14 @@ export default function ProviderPanel() {
             )}
 
             {/* Withdrawable Balance Card */}
-            <div style={{ ...card({ background: 'linear-gradient(160deg,#fff,#f0f9f5)' }) }}>
+            <div style={{ ...card({ background: 'var(--card-bg, rgba(18, 22, 32, 0.85))' }) }}>
               <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 11, color: '#6fa98f', letterSpacing: '.05em', textTransform: 'uppercase' }}>Withdrawable balance</div>
               <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 30, fontWeight: 700, marginTop: 10 }}>{fmtINR(Math.max(0, availableToWithdraw))}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 6 }}>Ready to withdraw to UPI</div>
-              <button onClick={() => setActiveSection('balance')} style={{ marginTop: 20, width: '100%', padding: 13, borderRadius: 12, background: '#1f2937', color: '#fdf3ef', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--card-muted, #94a3ae)', marginTop: 6 }}>Ready to withdraw to UPI</div>
+              <button onClick={() => setActiveSection('balance')} style={{ marginTop: 20, width: '100%', padding: 13, borderRadius: 12, background: 'var(--btn-dark-bg, #c9a84c)', color: 'var(--btn-dark-text, #090909)', fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 Withdraw to UPI →
               </button>
-              <p style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 14 }}>UPI: <strong>{currentUpi || 'Not linked'}</strong></p>
+              <p style={{ fontSize: 11.3, color: 'var(--card-muted, #94a3ae)', marginTop: 14 }}>UPI: <strong>{currentUpi || 'Not linked'}</strong></p>
             </div>
           </div>
 
@@ -334,10 +336,10 @@ export default function ProviderPanel() {
               { icon: '🆔', label: 'Update KYC', sub: 'Lender verification', sec: 'kyc' },
               { icon: '🎧', label: 'Contact support', sub: 'Help & FAQs', sec: 'help' },
             ].map(qa => (
-              <button key={qa.sec + qa.label} onClick={() => setActiveSection(qa.sec)} style={{ background: '#fff', borderRadius: 16, padding: 18, boxShadow: '0 20px 40px -26px rgba(31,41,55,.22)', display: 'flex', flexDirection: 'column', gap: 10, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+              <button key={qa.sec + qa.label} onClick={() => setActiveSection(qa.sec)} style={{ background: 'var(--card-bg, rgba(18, 22, 32, 0.85))', border: '1px solid var(--card-border, rgba(255, 255, 255, 0.09))', color: 'var(--card-text, #f3f3fa)', borderRadius: 16, padding: 18, boxShadow: 'var(--card-shadow, 0 20px 40px -26px rgba(0,0,0,.5))', display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(143,191,163,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{qa.icon}</div>
                 <span style={{ fontSize: 13.5, fontWeight: 700 }}>{qa.label}</span>
-                <span style={{ fontSize: 11.5, color: '#64748b' }}>{qa.sub}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--card-muted, #94a3b8)' }}>{qa.sub}</span>
               </button>
             ))}
           </div>
