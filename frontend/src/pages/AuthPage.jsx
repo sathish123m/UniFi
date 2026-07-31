@@ -55,7 +55,6 @@ export default function AuthPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [devOtp, setDevOtp] = useState("");
   const [universities, setUniversities] = useState([]);
   const allowedDomains = universities.map((u) => u.emailDomain);
   const allowedDomain = allowedDomains[0] || "lpu.in";
@@ -121,7 +120,6 @@ export default function AuthPage() {
     e.preventDefault();
     setMessage("");
     setError("");
-    setDevOtp("");
     try {
       const response = await login({
         ...loginForm,
@@ -131,8 +129,7 @@ export default function AuthPage() {
 
       if (response?.data?.requires2FA) {
         setTwoFaMode(true);
-        setMessage(response.data.message || "2FA code sent to your email.");
-        if (response.data.devOtp) setDevOtp(response.data.devOtp);
+        setMessage(response.data.message || "2FA authentication code sent to your email.");
         return;
       }
 
@@ -146,10 +143,8 @@ export default function AuthPage() {
     setMessage("");
     setError("");
     try {
-      const response = await resendOtp(loginForm.email, "ADMIN_2FA", "ADMIN");
-      setMessage("New 2FA authentication code generated and sent.");
-      const devCode = response?.devOtp || response?.data?.devOtp;
-      if (devCode) setDevOtp(devCode);
+      await resendOtp(loginForm.email, "ADMIN_2FA", "ADMIN");
+      setMessage("New 2FA authentication code sent to your registered email.");
     } catch (err) {
       setError(parseError(err));
     }
@@ -159,16 +154,13 @@ export default function AuthPage() {
     e.preventDefault();
     setMessage("");
     setError("");
-    setDevOtp("");
     try {
-      const response = await forgotPassword({
+      await forgotPassword({
         email: forgotForm.email,
         requestedRole: forgotForm.requestedRole || undefined,
       });
-      setMessage("Password reset OTP sent to your email.");
+      setMessage("Password reset OTP sent to your registered email.");
       setForgotForm((p) => ({ ...p, step: 2 }));
-      const devCode = response?.devOtp || response?.data?.devOtp;
-      if (devCode) setDevOtp(devCode);
     } catch (err) {
       setError(parseError(err));
     }
@@ -202,7 +194,6 @@ export default function AuthPage() {
     e.preventDefault();
     setMessage("");
     setError("");
-    setDevOtp("");
 
     const normalizedEmail = String(registerForm.email || "")
       .trim()
@@ -226,7 +217,7 @@ export default function AuthPage() {
     }
 
     try {
-      const response = await register(registerForm);
+      await register(registerForm);
       setOtpForm((p) => ({
         ...p,
         email: registerForm.email,
@@ -234,10 +225,8 @@ export default function AuthPage() {
       }));
       setTab("verify");
       setMessage(
-        "Registration created. Check Inbox/Spam/Quarantine for OTP, then verify.",
+        "Registration created. Please check your registered email inbox for your 6-digit OTP.",
       );
-      const devCode = response?.devOtp || response?.data?.devOtp;
-      if (devCode) setDevOtp(devCode);
     } catch (err) {
       setError(parseError(err));
     }
@@ -253,11 +242,10 @@ export default function AuthPage() {
         requestedRole: otpForm.requestedRole || loginPortal || undefined,
         otp: otpForm.otp.trim(),
       });
-      setMessage("Email verified. Login now.");
+      setMessage("Email verified successfully! You may now log in.");
       setTab("login");
       setLoginForm((p) => ({ ...p, email: otpForm.email }));
       if (otpForm.requestedRole) setLoginPortal(otpForm.requestedRole);
-      setDevOtp("");
     } catch (err) {
       setError(parseError(err));
     }
@@ -267,13 +255,11 @@ export default function AuthPage() {
     setError("");
     setMessage("");
     try {
-      const response = await resendOtp(
+      await resendOtp(
         otpForm.email,
         otpForm.requestedRole || loginPortal || undefined,
       );
-      setMessage("OTP sent again. Check Inbox/Spam/Quarantine.");
-      const devCode = response?.devOtp || response?.data?.devOtp;
-      if (devCode) setDevOtp(devCode);
+      setMessage("OTP sent again. Please check your email inbox.");
     } catch (err) {
       setError(parseError(err));
     }
@@ -369,35 +355,6 @@ export default function AuthPage() {
               required
             />
 
-            {devOtp ? (
-              <div
-                style={{
-                  background: 'rgba(201, 168, 76, 0.12)',
-                  border: '1px solid rgba(201, 168, 76, 0.4)',
-                  borderRadius: 12,
-                  padding: 14,
-                  marginTop: 8,
-                  marginBottom: 8,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  ⚡ 2FA Verification Code
-                </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: 6, margin: '4px 0', color: 'var(--text)' }}>
-                  {devOtp}
-                </div>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => setTwoFaCode(devOtp)}
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', borderRadius: 8, marginTop: 4 }}
-                >
-                  ✨ Auto-Fill 2FA Code
-                </button>
-              </div>
-            ) : null}
-
             <button className="btn btn-primary" disabled={loading || twoFaCode.length !== 6} type="submit">
               {loading ? "Verifying 2FA..." : "Verify 2FA & Continue ➔"}
             </button>
@@ -417,7 +374,6 @@ export default function AuthPage() {
                 onClick={() => {
                   setTwoFaMode(false);
                   setTwoFaCode("");
-                  setDevOtp("");
                 }}
                 style={{ flex: 1, fontSize: '0.83rem' }}
               >
@@ -626,34 +582,6 @@ export default function AuthPage() {
               </select>
             </label>
 
-            {devOtp ? (
-              <div
-                style={{
-                  background: 'rgba(201, 168, 76, 0.12)',
-                  border: '1px solid rgba(201, 168, 76, 0.4)',
-                  borderRadius: 12,
-                  padding: 14,
-                  marginTop: 10,
-                  marginBottom: 10,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  ⚡ Instant Verification Code
-                </div>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, letterSpacing: 6, margin: '4px 0', color: 'var(--text)' }}>
-                  {devOtp}
-                </div>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => setOtpForm((p) => ({ ...p, otp: devOtp }))}
-                  style={{ width: '100%', padding: '9px 12px', fontSize: '0.85rem', borderRadius: 8, marginTop: 4 }}
-                >
-                  ✨ Auto-Fill Code
-                </button>
-              </div>
-            ) : null}
             <button
               className="btn btn-primary"
               disabled={loading}
@@ -738,16 +666,6 @@ export default function AuthPage() {
               </>
             )}
 
-            {devOtp && forgotForm.step === 2 ? (
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setForgotForm((p) => ({ ...p, otp: devOtp }))}
-              >
-                Use Dev OTP ({devOtp})
-              </button>
-            ) : null}
-
             <button className="btn btn-primary" disabled={loading} type="submit">
               {loading
                 ? "Please wait..."
@@ -770,11 +688,6 @@ export default function AuthPage() {
 
         {error && <p className="error-text">{error}</p>}
         {message && <p className="success-text">{message}</p>}
-        {devOtp && (
-          <p className="success-text">
-            Dev OTP: <b>{devOtp}</b>
-          </p>
-        )}
       </div>
     </div>
   );
