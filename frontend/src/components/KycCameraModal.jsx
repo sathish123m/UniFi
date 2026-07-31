@@ -9,6 +9,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
   const [successMsg, setSuccessMsg] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (isOpen && !capturedSelfie) {
@@ -24,6 +25,13 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
   const startCamera = async () => {
     setError('')
     setSuccessMsg('')
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setError('Webcam access is restricted or unsupported on this connection. You can upload a photo file directly below!')
+      setCameraActive(false)
+      return
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
@@ -34,35 +42,52 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
       }
       setCameraActive(true)
     } catch (err) {
-      setError('Webcam access denied or camera unavailable. Please grant camera permission in your browser.')
+      setError('Webcam permission denied or camera in use. Select a photo file directly below!')
       setCameraActive(false)
     }
   }
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-    }
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+    } catch {}
     setCameraActive(false)
   }
 
   const capturePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas')
-      canvas.width = videoRef.current.videoWidth || 640
-      canvas.height = videoRef.current.videoHeight || 480
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-      setCapturedSelfie(dataUrl)
+    try {
+      if (videoRef.current) {
+        const canvas = document.createElement('canvas')
+        canvas.width = videoRef.current.videoWidth || 640
+        canvas.height = videoRef.current.videoHeight || 480
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+        setCapturedSelfie(dataUrl)
+        stopCamera()
+      }
+    } catch (err) {
+      setError('Failed to capture photo from video stream')
+    }
+  }
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      setCapturedSelfie(evt.target.result)
       stopCamera()
     }
+    reader.readAsDataURL(file)
   }
 
   const handleUploadSelfie = async () => {
     if (!capturedSelfie) {
-      setError('Please capture a photo first.')
+      setError('Please capture or select a photo first.')
       return
     }
     setLoading(true)
@@ -89,13 +114,21 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
         position: 'fixed',
         inset: 0,
         zIndex: 1200,
-        background: 'rgba(0, 0, 0, 0.75)',
+        background: 'rgba(0, 0, 0, 0.8)',
         backdropFilter: 'blur(12px)',
         display: 'grid',
         placeItems: 'center',
         padding: 20,
       }}
     >
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept="image/*"
+        style={{ display: 'none' }}
+      />
+
       <div
         style={{
           maxWidth: 500,
@@ -133,7 +166,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
           📷 Live Webcam Face KYC
         </h3>
         <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--card-muted, #8b949e)' }}>
-          Align your face in the center of the frame and click capture to perform live facial verification.
+          Align your face in the frame or select a photo file to perform live facial verification.
         </p>
 
         {error && (
@@ -150,7 +183,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
         <div
           style={{
             width: '100%',
-            height: 280,
+            height: 260,
             borderRadius: 16,
             background: '#000',
             overflow: 'hidden',
@@ -162,21 +195,42 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
           }}
         >
           {!cameraActive && !capturedSelfie && (
-            <button
-              type="button"
-              onClick={startCamera}
-              style={{
-                background: 'var(--gold, #c9a84c)',
-                color: '#000',
-                fontWeight: 700,
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: 10,
-                cursor: 'pointer',
-              }}
-            >
-              📷 Open Webcam Stream
-            </button>
+            <div style={{ textAlign: 'center', padding: 20 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>📷</div>
+              <button
+                type="button"
+                onClick={startCamera}
+                style={{
+                  background: 'var(--gold, #c9a84c)',
+                  color: '#000',
+                  fontWeight: 700,
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  marginRight: 8,
+                }}
+              >
+                Start Webcam
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '10px 18px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Upload Photo File
+              </button>
+            </div>
           )}
 
           {cameraActive && (
@@ -205,14 +259,14 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           {cameraActive && (
             <button
               type="button"
               onClick={capturePhoto}
               style={{
                 flex: 1,
-                padding: 13,
+                padding: 12,
                 borderRadius: 12,
                 background: 'var(--green, #00d09c)',
                 color: '#000',
@@ -236,7 +290,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
                 }}
                 style={{
                   flex: 1,
-                  padding: 13,
+                  padding: 12,
                   borderRadius: 12,
                   border: '1px solid var(--border, #30363d)',
                   background: 'transparent',
@@ -254,7 +308,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
                 disabled={loading}
                 style={{
                   flex: 2,
-                  padding: 13,
+                  padding: 12,
                   borderRadius: 12,
                   background: 'var(--gold, #c9a84c)',
                   color: '#000',
@@ -264,7 +318,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
                   fontSize: 14,
                 }}
               >
-                {loading ? 'Uploading...' : '🔒 Save Selfie to Database'}
+                {loading ? 'Uploading...' : '🔒 Save Photo to DB'}
               </button>
             </>
           )}

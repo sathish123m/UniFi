@@ -34,6 +34,10 @@ export default function MultiDocumentKycModal({ isOpen, onClose, accessToken, cu
 
   const startCamera = async () => {
     setError('')
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setError('Webcam access is restricted or unsupported on this connection. Please upload an ID document instead.')
+      return
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } })
       if (videoRef.current) {
