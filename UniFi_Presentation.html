@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UniFi — Pitch Presentation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: 16in 9in;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #06060a;
+      color: #f0f0f8;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .slide {
+      width: 16in;
+      height: 9in;
+      page-break-after: always;
+      position: relative;
+      background: radial-gradient(circle at 80% 20%, rgba(201, 168, 76, 0.12) 0%, transparent 40%),
+                  radial-gradient(circle at 10% 80%, rgba(0, 208, 156, 0.08) 0%, transparent 40%),
+                  #06060a;
+      padding: 3.5rem 4.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #c9a84c;
+      letter-spacing: 1px;
+    }
+    .slide-num {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    h1.title {
+      font-family: 'Syne', sans-serif;
+      font-size: 3.8rem;
+      font-weight: 800;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #ffffff 40%, #c9a84c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.2rem;
+    }
+
+    h2.subtitle {
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: #94a3b8;
+      line-height: 1.5;
+      max-width: 85%;
+    }
+
+    .title-slide-content {
+      margin-top: 4rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(201, 168, 76, 0.15);
+      border: 1px solid rgba(201, 168, 76, 0.35);
+      color: #f0d885;
+      padding: 0.6rem 1.4rem;
+      border-radius: 100px;
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      margin-top: 1.5rem;
+      flex: 1;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2rem;
+      margin-top: 1.5rem;
+      flex: 1;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1.5rem;
+      padding: 2.2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-icon {
+      font-size: 2.8rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 0.8rem;
+    }
+
+    .card-desc {
+      font-size: 1.05rem;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+
+    .highlight {
+      color: #00d09c;
+      font-weight: 700;
+    }
+
+    .gold-highlight {
+      color: #c9a84c;
+      font-weight: 700;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 1.2rem;
+      font-size: 0.95rem;
+      color: #64748b;
+    }
+
+    ul.bullets {
+      list-style: none;
+      margin-top: 1rem;
+    }
+    ul.bullets li {
+      position: relative;
+      padding-left: 2rem;
+      margin-bottom: 1.2rem;
+      font-size: 1.15rem;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+    ul.bullets li::before {
+      content: "➔";
+      position: absolute;
+      left: 0;
+      color: #c9a84c;
+      font-weight: 700;
+    }
+
+    .stat-number {
+      font-family: 'Syne', sans-serif;
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: #c9a84c;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-label {
+      font-size: 1.1rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .pill {
+      background: rgba(0, 208, 156, 0.15);
+      color: #00d09c;
+      border: 1px solid rgba(0, 208, 156, 0.3);
+      padding: 0.3rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: inline-block;
+      margin-top: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SLIDE 1: Title -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">01 / 10</div>
+    </div>
+    <div class="title-slide-content">
+      <div class="badge">🚀 Campus Fintech Innovation</div>
+      <h1 class="title">UniFi — Campus Peer-to-Peer<br>Micro-Lending Platform</h1>
+      <h2 class="subtitle">Empowering students through instant, transparent, and trust-based peer financial capital.</h2>
+    </div>
+    <div class="footer">
+      <span>Presented by: UniFi Executive Team</span>
+      <span>Live URL: unifine.vercel.app</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: Problem -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">02 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">The Problem</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Campus micro-cashflow gaps lack modern financial solutions.</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">⏳</div>
+        <div class="card-title">Traditional Banks Fail Students</div>
+        <div class="card-desc">Standard banks require income proof, credit scores, collateral, and parents' signatures — taking weeks for approval.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">💸</div>
+        <div class="card-title">Unplanned Micro-Expenses</div>
+        <div class="card-desc">Students face unexpected costs (exam fees, lab materials, hostel rent, laptops) that cannot wait until monthly stipends arrive.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛑</div>
+        <div class="card-title">Informal Borrowing Stress</div>
+        <div class="card-desc">Borrowing from peers informally creates social friction, lacks clear repayment schedules, and leaves no digital credit footprint.</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>Problem Analysis</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: Solution -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">03 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">The Solution</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Zero paperwork. 100% digital peer-to-peer campus marketplace.</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <div class="card-title">Direct Student-to-Student Loans</div>
+        <div class="card-desc">Connects verified student borrowers with student providers looking for short-term, yield-generating investments.</div>
+        <ul class="bullets" style="margin-top: 1.5rem;">
+          <li>Flexible tenures: 7, 14, 30, 60, or 90 days.</li>
+          <li>Micro-amounts: ₹500 to ₹50,000.</li>
+          <li>Instant UPI disbursal upon provider funding.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-icon">🎓</div>
+        <div class="card-title">Verified University Ecosystem</div>
+        <div class="card-desc">Strict university email domain enforcement ensures only verified campus peers participate.</div>
+        <ul class="bullets" style="margin-top: 1.5rem;">
+          <li>Institutional email validation (@lpu.in, @campus.edu).</li>
+          <li>Campus-only marketplace visibility.</li>
+          <li>Digital credit building for early-career students.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>Core Value Proposition</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: Key Innovations -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">04 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">Key Innovations & Security</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Multi-layered trust architecture built for campus scale.</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">📷</div>
+        <div class="card-title">Live Webcam AI KYC</div>
+        <div class="card-desc">Facial liveness verification via browser webcam + College ID card upload with database image persistence.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛡️</div>
+        <div class="card-title">Peer Guarantor System</div>
+        <div class="card-desc">Loans above ₹5,000 require a verified campus peer email guarantor, reducing default risk exponentially.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <div class="card-title">Campus Credit Score</div>
+        <div class="card-desc">Proprietary algorithm that dynamically calculates credit rating (300-900) based on repayment promptness.</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>Security & Technology</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: Borrower Flow -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">05 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">Borrower Portal Experience</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">3 clicks to request funding on the marketplace.</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="stat-number">01</div>
+        <div class="card-title">Configure Loan</div>
+        <div class="card-desc">Select amount, purpose (Tuition, Books, Hostel, Equipment), and preferred tenure.</div>
+      </div>
+      <div class="card">
+        <div class="stat-number">02</div>
+        <div class="card-title">Marketplace Listing</div>
+        <div class="card-desc">Request is listed on campus marketplace for verified providers to review and fund.</div>
+      </div>
+      <div class="card">
+        <div class="stat-number">03</div>
+        <div class="card-title">UPI Disbursal</div>
+        <div class="card-desc">Funds transfer directly to borrower's UPI account. Repayments tracked seamlessly.</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>User Experience — Borrower</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: Provider / Investor Flow -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">06 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">Provider / Lender Experience</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Earn attractive returns while supporting campus peers.</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="stat-number">3%-16%</div>
+        <div class="stat-label">Yield Interest Returns</div>
+        <div class="card-desc" style="margin-top: 1rem;">Earn predictable returns higher than conventional bank savings accounts.</div>
+      </div>
+      <div class="card">
+        <div class="stat-number">100%</div>
+        <div class="stat-label">Marketplace Control</div>
+        <div class="card-desc" style="margin-top: 1rem;">Filter requests by credit score, tenure, and purpose before committing funds.</div>
+      </div>
+      <div class="card">
+        <div class="stat-number">Instant</div>
+        <div class="stat-label">Wallet Withdrawals</div>
+        <div class="card-desc" style="margin-top: 1rem;">Seamlessly deposit funds via Razorpay/UPI and withdraw earnings directly to bank account.</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>User Experience — Lender</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: Technical Stack -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">07 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">Technical Architecture</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Modern, resilient, and enterprise-grade stack.</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Frontend Architecture</div>
+        <ul class="bullets">
+          <li><strong>React 18 + Vite</strong>: Ultra-fast single-page app architecture.</li>
+          <li><strong>Glassmorphic Design System</strong>: Custom dark mode CSS variables, micro-animations.</li>
+          <li><strong>Auth Interceptor</strong>: Automatic 401 token refresh & session hydration.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">Backend Architecture</div>
+        <ul class="bullets">
+          <li><strong>Node.js & Express</strong>: Asynchronous non-blocking API backend.</li>
+          <li><strong>Prisma ORM & PostgreSQL</strong>: Relational database with CUID2 primary keys.</li>
+          <li><strong>Razorpay Integration</strong>: Webhook-driven payment dispatches.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>Technology Stack</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: Risk Mitigation -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">08 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">Risk Management & Compliance</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Comprehensive safeguards against delinquency and fraud.</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <div class="card-title">Auto Delinquency Sweeps</div>
+        <div class="card-desc">Hourly background jobs calculate late fees, update overdue statuses, and notify borrowers.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🚫</div>
+        <div class="card-title">Automatic Account Suspension</div>
+        <div class="card-desc">Loans crossing delinquency thresholds trigger instant account freeze and campus score drops.</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🏫</div>
+        <div class="card-title">University Hold Notices</div>
+        <div class="card-desc">Integrates with campus administration to issue academic hold notices on extreme default cases.</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>Risk & Compliance</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: Market Impact -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">09 / 10</div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size: 2.8rem;">Market Opportunity</h1>
+      <h2 class="subtitle" style="font-size: 1.3rem;">Massive TAM across higher education institutions.</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="stat-number">40M+</div>
+        <div class="stat-label">Higher Education Students in India</div>
+      </div>
+      <div class="card">
+        <div class="stat-number">₹5,000</div>
+        <div class="stat-label">Average Micro-Loan Ticket Size</div>
+      </div>
+      <div class="card">
+        <div class="stat-number">98%</div>
+        <div class="stat-label">Target Repayment Rate</div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>UniFi Pitch Deck</span>
+      <span>Market Opportunity</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: Conclusion -->
+  <div class="slide">
+    <div class="header">
+      <div class="brand">UniFi</div>
+      <div class="slide-num">10 / 10</div>
+    </div>
+    <div class="title-slide-content">
+      <div class="badge">🌐 Live Deployment</div>
+      <h1 class="title">Empowering Students Through<br>Peer Financial Trust.</h1>
+      <h2 class="subtitle" style="margin-top: 1.5rem;">
+        Experience the live production application at:<br>
+        <span class="gold-highlight" style="font-size: 2rem;">https://unifine.vercel.app</span>
+      </h2>
+    </div>
+    <div class="footer">
+      <span>Thank You! Questions & Answers Session</span>
+      <span>UniFi 2026</span>
+    </div>
+  </div>
+
+</body>
+</html>

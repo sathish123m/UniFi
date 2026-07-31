@@ -103,31 +103,6 @@ export default function ProviderPanel() {
   const [walletForm, setWalletForm] = useState({ amount: 5000, action: 'DEPOSIT' })
   const [withdrawAmount, setWithdrawAmount] = useState(5000)
 
-  // KYC & Camera Modals
-  const [cameraModalOpen, setCameraModalOpen] = useState(false)
-  const [kycModalOpen, setKycModalOpen] = useState(false)
-  const fileInputRef = useRef(null)
-
-  const handleIdCardUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setError('')
-    setMessage('')
-    try {
-      const payload = new FormData()
-      payload.append('idCard', file)
-      await api.post('/users/kyc/id-card', payload, accessToken, true)
-      setMessage('✓ Student ID card uploaded & saved to database!')
-      await reload()
-    } catch (err) {
-      setError(err.message || 'Failed to upload ID card')
-    }
-  }
-
-  // Help
-  const [openFaq, setOpenFaq] = useState(null)
-  const [ticketForm, setTicketForm] = useState({ category: 'REPAYMENT', subject: '', message: '' })
-
   const reload = async () => {
     setLoading(true)
     setError('')
@@ -156,6 +131,31 @@ export default function ProviderPanel() {
       setLoading(false)
     }
   }
+
+  // KYC & Camera Modals
+  const [cameraModalOpen, setCameraModalOpen] = useState(false)
+  const [kycModalOpen, setKycModalOpen] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleIdCardUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setMessage('')
+    try {
+      const payload = new FormData()
+      payload.append('idCard', file)
+      await api.post('/users/kyc/id-card', payload, accessToken, true)
+      setMessage('✓ Student ID card uploaded & saved to database!')
+      await reload()
+    } catch (err) {
+      setError(err.message || 'Failed to upload ID card')
+    }
+  }
+
+  // Help
+  const [openFaq, setOpenFaq] = useState(null)
+  const [ticketForm, setTicketForm] = useState({ category: 'REPAYMENT', subject: '', message: '' })
 
   useEffect(() => { reload() }, [])
 

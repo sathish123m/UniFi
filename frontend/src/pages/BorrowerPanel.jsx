@@ -111,32 +111,6 @@ export default function BorrowerPanel() {
   const [personalForm, setPersonalForm] = useState({ firstName: '', lastName: '', phone: '' })
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [borrowForm, setBorrowForm] = useState({ principalAmount: 5000, tenure: 'SIXTY', purpose: 'TUITION', purposeNote: '', guarantorEmail: '', openToAny: true })
-  // KYC & Camera Modals
-  const [cameraModalOpen, setCameraModalOpen] = useState(false)
-  const [kycModalOpen, setKycModalOpen] = useState(false)
-  const fileInputRef = useRef(null)
-
-  const handleIdCardUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setError('')
-    setMessage('')
-    try {
-      const payload = new FormData()
-      payload.append('idCard', file)
-      await api.post('/users/kyc/id-card', payload, accessToken, true)
-      setMessage('✓ Student ID card uploaded & saved to database!')
-      await reload()
-    } catch (err) {
-      setError(err.message || 'Failed to upload ID card')
-    }
-  }
-
-  const [loanTab, setLoanTab] = useState('all')
-  const [openFaq, setOpenFaq] = useState(null)
-  const [ticketForm, setTicketForm] = useState({ category: 'REPAYMENT', subject: '', message: '' })
-  const [passwordShowMap, setPasswordShowMap] = useState({ cur: false, new: false, confirm: false })
-
   const reload = async () => {
     setLoading(true)
     setError('')
@@ -163,6 +137,32 @@ export default function BorrowerPanel() {
       setLoading(false)
     }
   }
+
+  // KYC & Camera Modals
+  const [cameraModalOpen, setCameraModalOpen] = useState(false)
+  const [kycModalOpen, setKycModalOpen] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleIdCardUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setMessage('')
+    try {
+      const payload = new FormData()
+      payload.append('idCard', file)
+      await api.post('/users/kyc/id-card', payload, accessToken, true)
+      setMessage('✓ Student ID card uploaded & saved to database!')
+      await reload()
+    } catch (err) {
+      setError(err.message || 'Failed to upload ID card')
+    }
+  }
+
+  const [loanTab, setLoanTab] = useState('all')
+  const [openFaq, setOpenFaq] = useState(null)
+  const [ticketForm, setTicketForm] = useState({ category: 'REPAYMENT', subject: '', message: '' })
+  const [passwordShowMap, setPasswordShowMap] = useState({ cur: false, new: false, confirm: false })
 
   useEffect(() => { reload() }, [])
 
