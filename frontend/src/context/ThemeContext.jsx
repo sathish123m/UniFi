@@ -10,14 +10,17 @@ const readPreference = () => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved === 'dark' || saved === 'light' || saved === 'system') return saved
   } catch {
-    return 'system'
+    return 'light'
   }
-  return 'system'
+  return 'light'
 }
 
 export function ThemeProvider({ children }) {
   const [preference, setPreference] = useState(readPreference)
-  const [resolvedTheme, setResolvedTheme] = useState(() => (readPreference() === 'system' ? getSystemTheme() : readPreference()))
+  const [resolvedTheme, setResolvedTheme] = useState(() => {
+    const pref = readPreference()
+    return pref === 'system' ? getSystemTheme() : pref
+  })
 
   useEffect(() => {
     const applyResolved = () => {
