@@ -8,8 +8,12 @@ router.use(protect)
 // Marketplace (providers only)
 router.get('/marketplace', restrictTo('PROVIDER'), async (req,res) => ok(res, await loanSvc.getMarketplace(req.user.id, req.query)))
 
-// Create loan request (borrowers only)
-router.post('/', restrictTo('BORROWER'), requireKyc, requireUpi, validate(loanRequestSchema), async (req,res) => ok(res, await loanSvc.createLoan(req.user.id, req.body), 'Loan request created', 201))
+// Create loan request (borrowers only) — supports both POST /loans and POST /loans/request
+const handleCreateLoan = async (req, res) =>
+  ok(res, await loanSvc.createLoan(req.user.id, req.body), 'Loan request created', 201)
+
+router.post('/', restrictTo('BORROWER'), requireKyc, requireUpi, validate(loanRequestSchema), handleCreateLoan)
+router.post('/request', restrictTo('BORROWER'), requireKyc, requireUpi, validate(loanRequestSchema), handleCreateLoan)
 
 // My loans
 router.get('/my', async (req,res) => ok(res, await loanSvc.myLoans(req.user.id, req.user.role)))

@@ -42,9 +42,13 @@ app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      return corsOrigins().includes(origin)
-        ? callback(null, true)
-        : callback(new Error("CORS blocked"));
+      const allowedList = corsOrigins();
+      const isVercelDomain = /\.vercel\.app$/i.test(new URL(origin).hostname);
+      const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
+      if (allowedList.includes(origin) || isVercelDomain || isLocalhost) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
   }),
