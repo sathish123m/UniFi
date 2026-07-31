@@ -15,8 +15,11 @@ const readStored = () => {
 }
 
 const writeStored = (value) => {
-  if (!value) return localStorage.removeItem(STORAGE_KEY)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+  if (!value) {
+    localStorage.removeItem(STORAGE_KEY)
+  } else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+  }
 }
 
 export const AuthProvider = ({ children }) => {
@@ -26,37 +29,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(initial?.user || null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!accessToken || !refreshToken || !user) {
-      writeStored(null)
+  const setSession = (session) => {
+    if (!session) {
+      clearSession()
       return
     }
-    writeStored({ accessToken, refreshToken, user })
-  }, [accessToken, refreshToken, user])
+    const at = session.accessToken || ''
+    const rt = session.refreshToken || ''
+    const u = session.user || null
 
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === STORAGE_KEY) {
-        const updated = readStored()
-        if (!updated) {
-          setAccessToken('')
-          setRefreshToken('')
-          setUser(null)
-        } else {
-          setAccessToken(updated.accessToken || '')
-          setRefreshToken(updated.refreshToken || '')
-          setUser(updated.user || null)
-        }
-      }
-    }
-    window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
-  }, [])
-
-  const setSession = ({ accessToken: at, refreshToken: rt, user: u }) => {
     setAccessToken(at)
     setRefreshToken(rt)
     setUser(u)
+    writeStored({ accessToken: at, refreshToken: rt, user: u })
   }
 
   const clearSession = () => {
@@ -65,6 +50,62 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
     writeStored(null)
   }
+
+  // Listen to cross-tab storage changes and API interceptor auth updates
+  useEffect(() => {
+    const handleAuthUpdate = (e) => {
+      if (e.detail) {
+        setAccessToken(e.detail.accessToken || '')
+        setRefreshToken(e.detail.refreshToken || '')
+        setUser(e.detail.user || null)
+      }
+    }
+
+    const handleAuthClear = () => {
+      clearSession()
+    }
+
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_KEY) {
+        const updated = readStored()
+        if (!updated) {
+          clearSession()
+        } else {
+          setAccessToken(updated.accessToken || '')
+          setRefreshToken(updated.refreshToken || '')
+          setUser(updated.user || null)
+        }
+      }
+    }
+
+    window.addEventListener('unifi_auth_update', handleAuthUpdate)
+    window.addEventListener('unifi_auth_clear', handleAuthClear)
+    window.addEventListener('storage', handleStorageChange)
+
+    return () => {
+      window.removeEventListener('unifi_auth_update', handleAuthUpdate)
+      window.removeEventListener('unifi_auth_clear', handleAuthClear)
+      window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [])
+
+  // On initial load, attempt token refresh if refreshToken exists to ensure fresh session
+  useEffect(() => {
+    const hydrateSession = async () => {
+      const stored = readStored()
+      if (stored?.refreshToken && !stored?.accessToken) {
+        try {
+          const res = await api.post('/auth/refresh', { refreshToken: stored.refreshToken })
+          if (res?.data) {
+            setSession(res.data)
+          }
+        } catch {
+          clearSession()
+        }
+      }
+    }
+    hydrateSession()
+  }, [])
 
   const register = async (payload) => {
     setLoading(true)
@@ -84,10 +125,10 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const resendOtp = async (email, requestedRole) => {
+  const resendOtp = async (email, requestedRole, purpose = 'EMAIL_VERIFY') => {
     setLoading(true)
     try {
-      return await api.post('/auth/resend-otp', { email, purpose: 'EMAIL_VERIFY', requestedRole })
+      return await api.post('/auth/resend-otp', { email, purpose, requestedRole })
     } finally {
       setLoading(false)
     }
@@ -117,7 +158,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const me = async () => {
-    if (!accessToken) return null
+    if (!accessToken && !refreshToken) return null
     try {
       const response = await api.get('/auth/me', accessToken)
       setUser(response.data)
