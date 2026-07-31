@@ -50,10 +50,12 @@ export default function AppShell({
   const accentTone     = role.accent === 'p' ? 'green' : role.accent === 'a' ? 'blue' : 'gold'
   const name           = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'UniFi User'
 
-  // Scroll to top on every section transition
+  // Scroll to top on every section transition & update document title
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [location.pathname])
+    const currentSectionLabel = sections.find((s) => s.key === activeSection)?.label || 'Portal'
+    document.title = `${currentSectionLabel} — ${role.badge} | Uni-Fi`
+  }, [location.pathname, activeSection, role.badge, sections])
 
   const goTo = (sectionKey) => {
     navigate(`${baseRoute}/${sectionKey}`)
