@@ -1,14 +1,16 @@
 {
   "name": "unifi-backend",
   "version": "1.0.0",
-  "description": "UniFi P2P Campus Lending — Backend API",
+  "description": "UniFi Campus Trust Network — Backend API",
   "main": "src/index.js",
   "type": "commonjs",
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "db:prepare:prod": "node src/scripts/prepareDb.js",
+    "jobs:run": "node src/scripts/runJobs.js",
     "check:syntax": "find src prisma -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "test": "node --test tests/*.test.js",
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
     "db:migrate:prod": "npx prisma migrate deploy",
@@ -16,8 +18,7 @@
     "db:studio": "npx prisma studio",
     "db:reset": "npx prisma migrate reset",
     "db:push": "npx prisma db push",
-    "smtp:test": "node src/scripts/smtpTest.js",
-    "payment:test": "node src/scripts/paymentTest.js"
+    "smtp:test": "node src/scripts/smtpTest.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",
@@ -25,7 +26,6 @@
     "@prisma/client": "^5.10.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
-    "crypto-js": "^4.2.0",
     "dotenv": "^16.4.1",
     "express": "^4.18.2",
     "express-async-errors": "^3.1.1",
@@ -37,8 +37,6 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.9",
-    "razorpay": "^2.9.2",
-    "uuid": "^9.0.0",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },

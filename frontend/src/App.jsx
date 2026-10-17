@@ -23,7 +23,7 @@
  *  /provider/account             Profile & security settings
  *  /provider/kyc                 KYC 6-step verification
  *  /provider/provide             Marketplace (fund/decline)
- *  /provider/balance             Wallet, deposits, withdrawals
+ *  /provider/balance             Lending record & principal
  *  /provider/notifications       Portfolio alerts
  *  /provider/help                FAQs & support ticket
  *
@@ -31,10 +31,9 @@
  *  /admin/overview               Platform metrics
  *  /admin/accounts               User management + drawer
  *  /admin/kyc                    KYC review queue
- *  /admin/loans                  Loan monitor (force-match)
- *  /admin/defaults               Overdue & defaulters
- *  /admin/disputes               Dispute resolution
- *  /admin/policy                 Policy engine
+ *  /admin/loans                  Requests & loans monitor
+ *  /admin/defaults               Repayments & defaulters
+ *  /admin/policy                 Platform policy settings
  *  /admin/audit                  Admin audit log
  *
  *  /portal                       Legacy → SmartRoleRedirect
@@ -54,6 +53,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
+import { ROLE_HOME } from './lib/roles'
 
 import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
@@ -61,15 +61,6 @@ import BorrowerPanel from './pages/BorrowerPanel'
 import ProviderPanel from './pages/ProviderPanel'
 import AdminPanel from './pages/AdminPanel'
 import NotFoundPage from './pages/NotFoundPage'
-
-// ── Role → home route map ────────────────────────────────────────────────────
-export const ROLE_HOME = {
-  BORROWER:      '/borrower/overview',
-  PROVIDER:      '/provider/overview',
-  SUPER_ADMIN:   '/admin/overview',
-  MOD_ADMIN:     '/admin/overview',
-  FINANCE_ADMIN: '/admin/overview',
-}
 
 export default function App() {
   return (

@@ -28,6 +28,17 @@ services:
       - key: REDIS_URL
         sync: false
 
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -39,19 +50,10 @@ services:
         value: false
       - key: ALLOWED_UNIVERSITY_DOMAINS
         value: lpu.in,rguktn.ac.in
-      - key: ALLOWED_UNIVERSITY_DOMAIN
-        value: lpu.in
 
-      - key: PAYMENT_PROVIDER
-        value: RAZORPAY
-      - key: RAZORPAY_KEY_ID
-        sync: false
-      - key: RAZORPAY_KEY_SECRET
-        sync: false
-      - key: RAZORPAY_WEBHOOK_SECRET
-        sync: false
-      - key: RAZORPAY_VERIFY_API
-        value: true
+      # UniFi runs in record-only mode: no payment gateway and no money custody.
+      # Peers settle directly and confirm each side; there are no gateway or
+      # payout secrets to configure.
 
       - key: SMTP_HOST
         value: smtp.gmail.com
@@ -59,6 +61,8 @@ services:
         value: 465
       - key: EMAIL_PROVIDER
         value: SMTP
+      - key: EMAIL_SEND_RETRIES
+        value: 3
       - key: SMTP_SECURE
         value: true
       - key: SMTP_REQUIRE_TLS
@@ -97,6 +101,16 @@ services:
         sync: false
       - key: MAILJET_SENDER_NAME
         value: UniFi
+
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_ADMIN_FIRST_NAME
+        value: Platform
+      - key: SEED_ADMIN_LAST_NAME
+        value: Admin
+
       - key: DB_SEED_ON_DEPLOY
         value: true
       - key: SEED_TEST_USERS
@@ -106,19 +120,53 @@ services:
         value: MOCK
       - key: SMS_STRICT
         value: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
 
       - key: RATE_LIMIT_WINDOW_MS
         value: 60000
       - key: RATE_LIMIT_MAX_REQUESTS
         value: 100
       - key: AUTH_RATE_LIMIT_MAX
-        value: 10
+        value: 20
       - key: OTP_RATE_LIMIT_MAX
         value: 3
 
       - key: DEFAULT_AFTER_DAYS
         value: 15
-      - key: LATE_FEE_PER_DAY_BPS
-        value: 50
-      - key: MAX_LATE_FEE_PCT
-        value: 20
+      # No late fees: UniFi is interest-free and never charges penalties. Overdue
+      # and defaulted loans affect reputation/credit score only.
+
+  # Off-instance scheduler. Runs the delinquency sweep + maintenance cleanup on
+  # a fixed cadence so jobs still run when the free web instance is asleep, and
+  # so the API can safely scale beyond one instance later without duplicate work.
+  # NOTE: Render cron jobs require a paid plan; on the free plan the in-process
+  # scheduler in src/index.js keeps these jobs running while the API is awake.
+  - type: cron
+    name: unifi-jobs
+    runtime: node
+    rootDir: backend
+    plan: starter
+    schedule: "0 */6 * * *"
+    buildCommand: npm ci && npm run db:generate
+    startCommand: npm run jobs:run
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+

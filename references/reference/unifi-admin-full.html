@@ -546,11 +546,11 @@ h1,h2,h3,h4{font-family:'Poppins',sans-serif;font-weight:600;color:var(--ink);}
     <section class="dash-section" id="sec-policy">
       <div class="content-grid" style="grid-template-columns:1fr 1fr;">
         <div class="card">
-          <h4 style="font-size:15px;">Interest rate policy</h4>
-          <p style="font-size:12.2px;color:var(--ink-dim);margin-top:4px;">The range providers can choose from when setting their lending terms.</p>
+          <h4 style="font-size:15px;">Settlement policy</h4>
+          <p style="font-size:12.2px;color:var(--ink-dim);margin-top:4px;">UniFi is non-custodial and interest-free. Peers settle directly; both sides confirm in-app.</p>
           <div class="form-grid" style="margin-top:6px;">
-            <div class="field"><label>MINIMUM RATE (%)</label><input type="number" value="3" step="0.5"></div>
-            <div class="field"><label>MAXIMUM RATE (%)</label><input type="number" value="6" step="0.5"></div>
+            <div class="field"><label>INTEREST RATE (%)</label><input type="number" value="0" disabled></div>
+            <div class="field"><label>DISPUTE WINDOW (DAYS AFTER DUE)</label><input type="number" value="7"></div>
           </div>
         </div>
         <div class="card">
@@ -589,8 +589,8 @@ h1,h2,h3,h4{font-family:'Poppins',sans-serif;font-weight:600;color:var(--ink);}
           <div class="toggle-row"><span>Camera liveness check</span><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div>
           <div class="toggle-row"><span>Phone OTP verification</span><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div>
           <div class="toggle-row"><span>UPI ID linking</span><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div>
-          <div class="toggle-row"><span>Guarantor required above ₹20,000 (borrowers)</span><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div>
-          <div class="toggle-row"><span>PAN required above ₹40,000 interest/year (providers)</span><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div>
+          <div class="toggle-row"><span>Both-sides confirmation before a loan activates</span><b style="color:var(--ink-faint);font-size:11.5px;">Always required</b></div>
+          <div class="toggle-row"><span>Admin dispute mediation</span><div class="toggle on" onclick="this.classList.toggle('on')"><div class="knob"></div></div></div>
         </div>
         <button class="btn-dark" style="margin-top:18px;" onclick="showToast('Policy settings saved.')">Save policy changes</button>
       </div>
@@ -637,8 +637,8 @@ const auditLog = [
   {t:'29 Jul, 9:12 AM', a:'You approved KYC for Divya Menon'},
   {t:'28 Jul, 4:40 PM', a:"You suspended Meera Krishnan's account (repeated late repayments)"},
   {t:'28 Jul, 11:05 AM', a:"You increased Karan Mehta's credit limit to ₹12,000"},
-  {t:'27 Jul, 6:20 PM', a:'You resolved the KYC dispute raised by Sana Iyer'},
-  {t:'26 Jul, 2:15 PM', a:'You updated the campus interest rate cap to 6%'},
+  {t:'27 Jul, 6:20 PM', a:'You resolved the loan dispute raised by Sana Iyer'},
+  {t:'26 Jul, 2:15 PM', a:'You updated the campus borrowing limits'},
   {t:'25 Jul, 10:00 AM', a:'You flagged Aman Gupta as a defaulter'}
 ];
 
@@ -850,7 +850,7 @@ const topbarMap = {
   loans:['Requests & Loans','Every borrow request across the platform'],
   defaults:['Repayments & Defaults','Overdue tracking & the defaulter watchlist'],
   disputes:['Disputes','Grievances raised by borrowers & providers'],
-  policy:['Policy Settings','Campus-wide interest, limits & KYC rules'],
+  policy:['Policy Settings','Campus-wide limits, KYC rules & dispute policy'],
   audit:['Audit Log','Every action taken from this console']
 };
 function switchSection(name){

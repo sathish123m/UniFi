@@ -32,20 +32,22 @@ enum KycStatus {
 }
 
 enum LoanStatus {
-  PENDING          // Waiting for a provider to fund
-  FUNDED           // Provider accepted, waiting for disbursal
-  ACTIVE           // Money disbursed to borrower
-  REPAID           // Borrower repaid in full
-  DEFAULTED        // Past due date, not repaid
-  CANCELLED        // No provider within 24h / borrower cancelled
+  PENDING          // Waiting for a peer to commit to lending
+  FUNDED           // Peer committed; awaiting handover confirmation from both sides
+  ACTIVE           // Both sides confirmed the handover; money is with the borrower
+  REPAID           // Both sides confirmed the repayment
+  DEFAULTED        // Past due date without repayment
+  CANCELLED        // No peer within 24h / borrower cancelled
 }
 
+// UniFi is non-custodial: no money flows through the platform. These rows are a
+// confirmation ledger recording what the two peers attested to, not a transfer.
 enum TransactionType {
-  DISBURSEMENT     // UniFi → Borrower (after provider funds escrow)
-  REPAYMENT        // Borrower → UniFi Escrow
-  PROVIDER_PAYOUT  // UniFi Escrow → Provider (after repayment)
-  PLATFORM_FEE     // UniFi keeps this slice
-  REFUND           // Edge case: cancelled loan refund to provider
+  DISBURSEMENT     // Lender attests the money was handed to the borrower
+  REPAYMENT        // Borrower attests the money was repaid to the lender
+  PROVIDER_PAYOUT  // Legacy (custodial era) — retained for old rows only
+  PLATFORM_FEE     // Legacy (custodial era) — retained for old rows only
+  REFUND           // Legacy (custodial era) — retained for old rows only
 }
 
 enum TransactionStatus {
@@ -153,6 +155,10 @@ model User {
   upiId            String?    // AES-256 encrypted at app layer before storing
   upiVerified      Boolean    @default(false)
 
+  // Legacy payout destination (custodial era). UniFi no longer pays providers —
+  // peers settle directly — so this is unused; retained for old rows only.
+  payoutFundAccountId String?
+
   // Credit Score (300–900, starts at 500)
   creditScore      Int        @default(500)
   borrowLimit      Int        @default(5000)   // in ₹, upgrades with score
@@ -200,9 +206,18 @@ model KycDocument {
   userId             String    @unique
   user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  studentIdFrontKey  String    // S3/R2 object key
+  studentIdFrontKey  String?   // S3/R2 object key (nullable: uploaded piecemeal)
   studentIdBackKey   String?   // optional back side
-  selfieKey          String    // live selfie
+  selfieKey          String?   // live selfie (nullable: uploaded piecemeal)
+
+  // Government identity (India KYC). Numbers are AES-256-GCM encrypted at rest
+  // (iv:tag:ciphertext) — never stored or logged in plaintext. The document
+  // images are private object keys, streamed only to authenticated admins.
+  aadhaarNumberEnc   String?   // encrypted 12-digit Aadhaar (Verhoeff-validated on entry)
+  aadhaarFrontKey    String?   // Aadhaar card front image
+  aadhaarBackKey     String?   // Aadhaar card back image
+  panNumberEnc       String?   // encrypted PAN (e.g. ABCPZ1234K, pattern-validated on entry)
+  panDocKey          String?   // PAN card image
 
   submittedAt        DateTime  @default(now())
   reviewedAt         DateTime?
@@ -272,16 +287,16 @@ model DeviceSession {
 
 // ============================================================
 //  PLATFORM CONFIG
-//  Admin-editable settings: interest rates, fees, limits
+//  Admin-editable settings: borrowing limits and score tiers.
+//  (Interest/fee fields are legacy from the custodial era and unused.)
 // ============================================================
 
 model PlatformConfig {
   id                    String   @id @default(cuid())
 
-  // Interest
-  interestRatePercent   Decimal  @default(5.0)   // 5% flat per loan
-  // Fee
-  platformFeePercent    Decimal  @default(10.0)  // 10% of interest amount
+  // Legacy (custodial era) — always ignored; kept for historical rows.
+  interestRatePercent   Decimal  @default(0)
+  platformFeePercent    Decimal  @default(0)
 
   // Loan limits (in ₹)
   minLoanAmount         Int      @default(500)
@@ -322,14 +337,19 @@ model Loan {
   provider         User?       @relation("ProviderLoans", fields: [providerId], references: [id])
 
   // Loan terms
+  //
+  // UniFi is non-custodial and interest-free: peers settle directly. These
+  // amount/rate columns are retained so historical (custodial-era) rows keep
+  // their values; new rows always store zero interest and
+  // `totalRepayAmount == principalAmount`.
   principalAmount  Int         // in ₹ (paise avoided for simplicity)
-  interestAmount   Int         // computed at creation: principal * rate
-  platformFeeAmount Int        // computed: interestAmount * fee%
-  totalRepayAmount Int         // principal + interestAmount
-  providerEarning  Int         // interestAmount - platformFeeAmount
+  interestAmount   Int         // always 0 for new loans
+  platformFeeAmount Int        // always 0 for new loans
+  totalRepayAmount Int         // equals principalAmount for new loans
+  providerEarning  Int         // always 0 for new loans
 
-  interestRate     Decimal     // snapshot of rate at time of creation
-  platformFeeRate  Decimal     // snapshot of fee at time of creation
+  interestRate     Decimal     @default(0) // always 0 for new loans
+  platformFeeRate  Decimal     @default(0) // always 0 for new loans
   tenure           Tenure
 
   // Purpose & display
@@ -343,24 +363,33 @@ model Loan {
   status           LoanStatus  @default(PENDING)
 
   // Key timestamps
-  requestedAt      DateTime    @default(now())
-  fundedAt         DateTime?   // Provider accepted + paid escrow
-  disbursedAt      DateTime?   // Borrower received money
-  dueAt            DateTime?   // Computed: disbursedAt + tenure days
-  repaidAt         DateTime?
-  cancelledAt      DateTime?
-  defaultedAt      DateTime?
+  requestedAt        DateTime    @default(now())
+  fundedAt           DateTime?   // Peer committed to lending
+  fundingSentAt      DateTime?   // Lender attests the money was handed over
+  fundingReceivedAt  DateTime?   // Borrower confirms the money was received
+  disbursedAt        DateTime?   // Set when BOTH sides confirm the handover
+  dueAt              DateTime?   // Computed: disbursedAt + tenure days
+  repayClaimedAt     DateTime?   // Borrower attests the money was repaid
+  repayConfirmedAt   DateTime?   // Lender confirms the repayment was received
+  repaidAt           DateTime?   // Set when BOTH sides confirm the repayment
+  cancelledAt        DateTime?
+  defaultedAt        DateTime?
 
-  // Razorpay references
-  rzpOrderId       String?     // Razorpay order ID for provider payment
-  rzpPaymentId     String?     // Razorpay payment ID (provider → escrow)
-  rzpRepayOrderId  String?     // Razorpay order for repayment
+  // Disputes — either party can flag a problem; surfaced to campus admins.
+  disputedAt         DateTime?
+  disputeReason      String?
+  disputeBy          String?     // userId who raised it
+
+  // Legacy Razorpay references (custodial era; unused now)
+  rzpOrderId       String?
+  rzpPaymentId     String?
+  rzpRepayOrderId  String?
   rzpRepayPaymentId String?
 
-  // Late tracking
+  // Overdue tracking (reputation only — no late fee is ever charged)
   isOverdue        Boolean     @default(false)
   overdueDays      Int         @default(0)
-  lateFeeAmount    Int         @default(0)
+  lateFeeAmount    Int         @default(0) // always 0
 
   // Soft delete / archive
   isArchived       Boolean     @default(false)
@@ -377,13 +406,15 @@ model Loan {
   @@index([publicId])
   @@index([dueAt])
   @@index([requestedAt])
+  @@index([disputedAt])
   @@map("loans")
 }
 
 // ============================================================
 //  TRANSACTION
-//  Immutable ledger. Every money movement gets a row.
-//  Never update — only insert. Source of truth for finance.
+//  Confirmation ledger. Records what each peer attested to (handover, repayment).
+//  Never update — only insert. In the custodial era this tracked money movements;
+//  UniFi is non-custodial now, so no row here implies the platform held funds.
 // ============================================================
 
 model Transaction {
@@ -397,11 +428,17 @@ model Transaction {
   status           TransactionStatus @default(INITIATED)
   amount           Int               // in ₹
 
-  // Razorpay
+  // Legacy Razorpay references (custodial era; unused now)
   rzpOrderId       String?
   rzpPaymentId     String?
-  rzpSignature     String?           // Webhook signature for verification
-  rzpRefId         String?           // Razorpay reference ID
+  rzpSignature     String?
+  rzpRefId         String?
+
+  // Legacy payout settlement (custodial era; unused now). `settledAt` and
+  // `settlementRef` are retained so historical rows keep their reconciliation
+  // data; no new row uses them.
+  settledAt        DateTime?
+  settlementRef    String?
 
   // Idempotency
   idempotencyKey   String            @unique  // Prevents duplicate charges
@@ -419,7 +456,9 @@ model Transaction {
   @@index([type])
   @@index([status])
   @@index([rzpPaymentId])
+  @@index([rzpOrderId])
   @@index([idempotencyKey])
+  @@index([type, settledAt])
   @@map("transactions")
 }
 

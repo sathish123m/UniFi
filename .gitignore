@@ -16,3 +16,7 @@ frontend/public/media/user-pack/motion-neon-b.mp4
 frontend/public/media/user-pack/5909909-uhd_2160_4096_25fps.mp4
 *.pdf
 
+# Internal planning / prompt scratch — not part of the shipped project
+UniFi_Complete_Project_Prompt.txt
+.venv/
+

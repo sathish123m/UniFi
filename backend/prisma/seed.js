@@ -6,16 +6,12 @@ require('dotenv').config()
 const { PrismaClient } = require('@prisma/client')
 const bcrypt = require('bcrypt')
 const { createId } = require('@paralleldrive/cuid2')
-const crypto = require('crypto')
+// Reuse the app's encryption util so seeded UPI IDs are stored in exactly the
+// same AES-256-GCM format the runtime uses (and require a real ENCRYPTION_KEY —
+// no insecure all-zero fallback).
+const { encrypt } = require('../src/utils/encryption')
 
 const prisma = new PrismaClient()
-const ALG = 'aes-256-cbc'
-const ENC_KEY = () => Buffer.from(process.env.ENCRYPTION_KEY || '0'.repeat(64), 'hex')
-const encrypt = (text) => {
-  const iv = crypto.randomBytes(16)
-  const c = crypto.createCipheriv(ALG, ENC_KEY(), iv)
-  return iv.toString('hex') + ':' + Buffer.concat([c.update(text, 'utf8'), c.final()]).toString('hex')
-}
 
 async function main() {
   console.log('🌱 Seeding UniFi database...\n')
@@ -93,8 +89,8 @@ async function main() {
     update: {},
     create: {
       id: 'config_default',
-      interestRatePercent: 5.0,
-      platformFeePercent: 10.0,
+      interestRatePercent: 0,
+      platformFeePercent: 0,
       minLoanAmount: 500,
       maxLoanAmount: 10000,
       scoreTier1MinScore: 300, scoreTier1Limit: 2000,
@@ -107,28 +103,35 @@ async function main() {
   })
   console.log('   ✓ Platform config seeded\n')
 
-  // ── Super Admin ───────────────────────────────────────
-  console.log('🛡️  Creating super admin...')
-  const adminPassword = await bcrypt.hash('Sathish@123', 12)
-  await prisma.user.upsert({
-    where: { id: 'admin_super_001' },
-    update: {
-      email: 'sathish085580@gmail.com',
-      passwordHash: adminPassword,
-    },
-    create: {
-      id: 'admin_super_001',
-      email: 'sathish085580@gmail.com',
-      passwordHash: adminPassword,
-      role: 'SUPER_ADMIN',
-      firstName: 'Sathish',
-      lastName: 'Admin',
-      kycStatus: 'APPROVED',
-      emailVerified: true,
-      isActive: true,
-    },
-  })
-  console.log('   ✓ Super admin created → sathish085580@gmail.com / Sathish@123\n')
+  // ── Super Admin (bootstrap from env; NEVER hardcode credentials) ──
+  const adminEmail = String(process.env.SEED_ADMIN_EMAIL || '').trim().toLowerCase()
+  const adminPasswordPlain = process.env.SEED_ADMIN_PASSWORD || ''
+  if (adminEmail && adminPasswordPlain) {
+    console.log('🛡️  Ensuring super admin exists...')
+    const existingAdmin = await prisma.user.findUnique({ where: { id: 'admin_super_001' } })
+    if (existingAdmin) {
+      // Create-only: never overwrite an existing admin's password on re-seed/redeploy.
+      console.log('   ✓ Super admin already exists — leaving credentials untouched\n')
+    } else {
+      const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
+      await prisma.user.create({
+        data: {
+          id: 'admin_super_001',
+          email: adminEmail,
+          passwordHash: adminPassword,
+          role: 'SUPER_ADMIN',
+          firstName: String(process.env.SEED_ADMIN_FIRST_NAME || 'Platform').trim(),
+          lastName: String(process.env.SEED_ADMIN_LAST_NAME || 'Admin').trim(),
+          kycStatus: 'APPROVED',
+          emailVerified: true,
+          isActive: true,
+        },
+      })
+      console.log(`   ✓ Super admin created → ${adminEmail}\n`)
+    }
+  } else {
+    console.log('⚠️  SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set — skipping admin creation.\n')
+  }
 
   // ── Demo Users (optional in production for test deployments) ──
   const seedTestUsers =
@@ -234,18 +237,20 @@ async function main() {
           borrowerId: demoBorrower.id,
           providerId: demoProvider.id,
           principalAmount: 2000,
-          interestAmount: 100,
-          platformFeeAmount: 10,
-          totalRepayAmount: 2100,
-          providerEarning: 90,
-          interestRate: 5.0,
-          platformFeeRate: 10.0,
+          interestAmount: 0,
+          platformFeeAmount: 0,
+          totalRepayAmount: 2000,
+          providerEarning: 0,
+          interestRate: 0,
+          platformFeeRate: 0,
           tenure: 'THIRTY',
           purpose: 'FOOD',
           purposeNote: 'Mess fee',
           publicId: 'UniFi#0001',
           status: 'ACTIVE',
           fundedAt: now,
+          fundingSentAt: now,
+          fundingReceivedAt: now,
           disbursedAt: now,
           dueAt,
         },
@@ -256,8 +261,7 @@ async function main() {
 
   console.log('✅ Seeding complete!\n')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('IMPORTANT: Change the admin password immediately!')
-  console.log('Admin: sathish085580@gmail.com / Sathish@123')
+  console.log('If a super admin was created, sign in and change the password immediately.')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
 }
 

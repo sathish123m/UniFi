@@ -1,3 +1,5 @@
+const logger = require('./logger')
+
 const err = (msg) => {
   throw new Error(`[ENV] ${msg}`)
 }
@@ -20,25 +22,6 @@ const checkSecretStrength = () => {
   if ((process.env.ENCRYPTION_KEY || '').length !== 64) err('ENCRYPTION_KEY must be 64 hex chars (32 bytes)')
 }
 
-const checkPaymentSecrets = () => {
-  const provider = (process.env.PAYMENT_PROVIDER || 'MOCK').toUpperCase()
-  if (provider === 'RAZORPAY') {
-    if (!process.env.RAZORPAY_KEY_ID) err('RAZORPAY_KEY_ID is required when PAYMENT_PROVIDER=RAZORPAY')
-    if (!process.env.RAZORPAY_KEY_SECRET) err('RAZORPAY_KEY_SECRET is required when PAYMENT_PROVIDER=RAZORPAY')
-    if (!process.env.RAZORPAY_WEBHOOK_SECRET) err('RAZORPAY_WEBHOOK_SECRET is required when PAYMENT_PROVIDER=RAZORPAY')
-    if ((process.env.RAZORPAY_KEY_ID || '').length < 12) err('RAZORPAY_KEY_ID looks invalid')
-    if ((process.env.RAZORPAY_KEY_SECRET || '').length < 12) err('RAZORPAY_KEY_SECRET looks invalid')
-    if ((process.env.RAZORPAY_WEBHOOK_SECRET || '').length < 8) err('RAZORPAY_WEBHOOK_SECRET looks invalid')
-    if (
-      /PASTE_/i.test(process.env.RAZORPAY_KEY_ID || '') ||
-      /PASTE_/i.test(process.env.RAZORPAY_KEY_SECRET || '') ||
-      /PASTE_/i.test(process.env.RAZORPAY_WEBHOOK_SECRET || '')
-    ) {
-      err('Replace Razorpay placeholder values with your Razorpay TEST credentials')
-    }
-  }
-}
-
 const checkEmailProviderConfig = () => {
   const provider = String(process.env.EMAIL_PROVIDER || 'SMTP').trim().toUpperCase()
   if (!['SMTP', 'BREVO_API', 'MAILJET_API'].includes(provider)) {
@@ -53,8 +36,8 @@ const checkEmailProviderConfig = () => {
   }
 
   if (provider === 'MAILJET_API') {
-    const key = String(process.env.MAILJET_API_KEY || process.env.SMTP_USER || '').trim()
-    const secret = String(process.env.MAILJET_API_SECRET || process.env.SMTP_PASS || '').trim()
+    const key = String(process.env.MAILJET_API_KEY || '').trim()
+    const secret = String(process.env.MAILJET_API_SECRET || '').trim()
     if (!key || !secret || key.length < 10 || secret.length < 10 || /PASTE_/i.test(key) || /PASTE_/i.test(secret)) {
       logger.warn('[ENV] MAILJET_API_KEY / SECRET missing or short; email fallback will be used')
     }
@@ -93,17 +76,18 @@ const checkRedisConfig = () => {
 const validateEnv = () => {
   checkRequired()
   checkSecretStrength()
-  checkPaymentSecrets()
   checkEmailProviderConfig()
   checkRedisConfig()
 }
 
 const corsOrigins = () => {
   const fromEnv = process.env.CORS_ORIGINS
+  // Only trust origins we actually own: the configured FRONTEND_URL plus local
+  // dev hosts. Production origins must be supplied explicitly via CORS_ORIGINS
+  // (comma-separated) — we never bake in guessed public hostnames, since an
+  // unowned origin combined with `credentials: true` is a real CSRF/creds risk.
   const defaults = [
     process.env.FRONTEND_URL || 'http://localhost:5173',
-    'https://unifine.vercel.app',
-    'https://unifi.vercel.app',
     'http://localhost:5173',
     'http://localhost:3000',
   ]
@@ -111,14 +95,11 @@ const corsOrigins = () => {
     const parsed = fromEnv.split(',').map((v) => v.trim()).filter(Boolean)
     return Array.from(new Set([...parsed, ...defaults]))
   }
-  return defaults
+  return Array.from(new Set(defaults))
 }
-
-const paymentProvider = () => (process.env.PAYMENT_PROVIDER || 'MOCK').toUpperCase()
 
 module.exports = {
   validateEnv,
   isProduction,
   corsOrigins,
-  paymentProvider,
 }

@@ -701,7 +701,7 @@ footer {
         Banks won't touch you. You don't have a credit history. Loan apps charge <em>predatory interest</em>. And borrowing from friends is always awkward.
       </p>
       <p class="story-body sr sr-delay-4">
-        Meanwhile, your batchmate Rohan has <em>₹5,000 sitting idle</em> in his account and wouldn't mind earning a small return on it — if only there was a safe way.
+        Meanwhile, your batchmate Rohan has <em>₹5,000 sitting idle</em> in his account and wouldn't mind lending it to a campusmate — if only there was a safe way.
       </p>
       <p class="story-body sr sr-delay-5" style="color:rgba(255,255,255,0.5);font-style:italic;border-left:2px solid rgba(201,168,76,0.4);padding-left:20px;margin-top:28px;">
         "There's a gap between students who need and students who have. UniFi is the bridge."
@@ -762,9 +762,9 @@ footer {
       <div class="step-card sr sr-delay-3">
         <div class="step-number">3</div>
         <span class="step-icon">⚡</span>
-        <div class="step-title">Money Moves via UPI</div>
-        <div class="step-desc">Provider sends to UniFi escrow. We release to the borrower instantly. On due date, borrower repays through UPI. Provider receives principal + returns. UniFi takes a small cut.</div>
-        <div class="step-for">Secure · Traceable · Fast</div>
+        <div class="step-title">Peers Settle Directly</div>
+        <div class="step-desc">The lender sends the amount straight to the borrower over UPI or cash. Both sides confirm the handover in-app. On the due date the borrower repays the lender directly — UniFi never holds the money.</div>
+        <div class="step-for">Direct · Confirmed · Zero interest</div>
       </div>
     </div>
   </div>
@@ -785,13 +785,13 @@ footer {
         <div class="portal-glyph admin-glyph">🛡️</div>
         <div class="portal-role admin-role">Admin Portal</div>
         <div class="portal-title">Command Center</div>
-        <div class="portal-desc">Full oversight of the entire platform. Review KYC, manage users, monitor every loan, configure platform fees, and keep the ecosystem healthy.</div>
+        <div class="portal-desc">Full oversight of the entire platform. Review KYC, manage users, monitor every loan, mediate disputes, and keep the ecosystem healthy.</div>
         <ul class="portal-features">
           <li class="portal-feature">KYC approval queue</li>
           <li class="portal-feature">Real-time loan monitoring</li>
           <li class="portal-feature">User suspend / ban controls</li>
-          <li class="portal-feature">Platform revenue analytics</li>
-          <li class="portal-feature">Interest rate configuration</li>
+          <li class="portal-feature">Dispute mediation queue</li>
+          <li class="portal-feature">Campus domain management</li>
         </ul>
         <a href="#" class="portal-cta admin-cta">Admin access →</a>
       </div>
@@ -802,9 +802,9 @@ footer {
         <div class="portal-desc">Request money when you need it. See your credit score grow with every repayment. No judgment, no paperwork — just fast campus credit.</div>
         <ul class="portal-features">
           <li class="portal-feature">Loan request builder</li>
-          <li class="portal-feature">Live repayment calculator</li>
+          <li class="portal-feature">Interest-free repayment preview</li>
           <li class="portal-feature">Credit score tracker</li>
-          <li class="portal-feature">One-tap UPI repayment</li>
+          <li class="portal-feature">Repayment confirmation</li>
           <li class="portal-feature">Borrowing limit upgrades</li>
         </ul>
         <a href="#cta-section" class="portal-cta borrower-cta">Start borrowing →</a>
@@ -812,16 +812,16 @@ footer {
       <div class="portal-card provider-card sr sr-delay-3">
         <div class="portal-glyph provider-glyph">📈</div>
         <div class="portal-role provider-role">Provider Portal</div>
-        <div class="portal-title">Earn Returns</div>
-        <div class="portal-desc">Put your idle money to work. Browse anonymous loan requests from verified campusmates, fund them, and earn returns — all tracked in real time.</div>
+        <div class="portal-title">Lend & Build Trust</div>
+        <div class="portal-desc">Help a verified campusmate, interest-free. Browse anonymous loan requests, lend directly, and track every rupee of principal you put out — all in real time.</div>
         <ul class="portal-features">
           <li class="portal-feature">Loan marketplace</li>
           <li class="portal-feature">Anonymous borrower profiles</li>
-          <li class="portal-feature">Portfolio earnings tracker</li>
+          <li class="portal-feature">Lending portfolio tracker</li>
           <li class="portal-feature">Risk & credit score filters</li>
-          <li class="portal-feature">UPI wallet & withdrawals</li>
+          <li class="portal-feature">Direct peer settlement</li>
         </ul>
-        <a href="#cta-section" class="portal-cta provider-cta">Start earning →</a>
+        <a href="#cta-section" class="portal-cta provider-cta">Start lending →</a>
       </div>
     </div>
   </div>
@@ -844,17 +844,17 @@ footer {
         <div class="flow-node-sub">Funds the loan</div>
       </div>
       <div class="flow-connector">
-        <div class="flow-label">UPI Transfer</div>
+        <div class="flow-label">Direct UPI / Cash</div>
         <div class="flow-label flow-label-bottom">₹ Principal</div>
       </div>
       <div class="flow-node" style="border-color:rgba(201,168,76,0.3);">
-        <span class="flow-node-icon">🔐</span>
-        <div class="flow-node-name">UniFi Escrow</div>
-        <div class="flow-node-sub">Holds & routes</div>
+        <span class="flow-node-icon">🤝</span>
+        <div class="flow-node-name">Dual Confirmation</div>
+        <div class="flow-node-sub">Both sides attest</div>
       </div>
       <div class="flow-connector">
-        <div class="flow-label">Instant Release</div>
-        <div class="flow-label flow-label-bottom">₹ To Borrower</div>
+        <div class="flow-label">Both confirm</div>
+        <div class="flow-label flow-label-bottom">Loan active</div>
       </div>
       <div class="flow-node">
         <span class="flow-node-icon">🎓</span>
@@ -870,23 +870,23 @@ footer {
         <span class="calc-value">₹2,000</span>
       </div>
       <div class="calc-row">
-        <span class="calc-label">Interest (5% flat)</span>
-        <span class="calc-value" style="color:var(--gold)">₹100</span>
+        <span class="calc-label">Interest</span>
+        <span class="calc-value" style="color:var(--green)">₹0</span>
       </div>
       <div class="calc-row">
-        <span class="calc-label">Platform Fee (10% of interest)</span>
-        <span class="calc-value" style="color:var(--muted)">₹10</span>
+        <span class="calc-label">Platform Fee</span>
+        <span class="calc-value" style="color:var(--green)">₹0</span>
       </div>
       <div class="calc-row">
-        <span class="calc-label">Provider earns</span>
-        <span class="calc-value" style="color:var(--green)">₹90 net</span>
+        <span class="calc-label">Lender receives</span>
+        <span class="calc-value" style="color:var(--green)">₹2,000</span>
       </div>
       <div class="calc-total">
         <div>
           <div class="calc-total-label">Borrower repays</div>
-          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Principal + interest, one payment</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Exactly what was borrowed — nothing more</div>
         </div>
-        <div class="calc-total-value">₹2,100</div>
+        <div class="calc-total-value">₹2,000</div>
       </div>
     </div>
   </div>
@@ -915,9 +915,9 @@ footer {
         <div class="trust-desc">Every user's student ID is manually reviewed by our admin team before activation.</div>
       </div>
       <div class="trust-card sr sr-delay-3">
-        <span class="trust-icon">🔒</span>
-        <div class="trust-title">Escrow Protection</div>
-        <div class="trust-desc">Funds are never held by borrowers or providers directly. UniFi escrow routes all transactions via Razorpay.</div>
+        <span class="trust-icon">🤝</span>
+        <div class="trust-title">Peer-to-Peer Settlement</div>
+        <div class="trust-desc">UniFi never holds your money. Peers settle directly and both sides confirm — the platform records the agreement.</div>
       </div>
       <div class="trust-card sr sr-delay-4">
         <span class="trust-icon">📊</span>
@@ -936,7 +936,7 @@ footer {
           </div>
         </div>
         <div class="testimonial">
-          <div class="testimonial-text">"I made ₹420 in interest last month on ₹8,000 I wasn't even using. That's more than my savings account."</div>
+          <div class="testimonial-text">"I lent ₹8,000 to a campusmate who needed it for a laptop. Got every rupee back — and built real trust."</div>
           <div class="testimonial-author">
             <div class="testimonial-avatar" style="background:rgba(0,208,156,0.1);">🙌</div>
             <div><div class="testimonial-name">UniFi #0394</div><div class="testimonial-meta">BITS Pilani · Provider</div></div>
@@ -965,7 +965,7 @@ footer {
           </div>
         </div>
         <div class="testimonial">
-          <div class="testimonial-text">"I made ₹420 in interest last month on ₹8,000 I wasn't even using. That's more than my savings account."</div>
+          <div class="testimonial-text">"I lent ₹8,000 to a campusmate who needed it for a laptop. Got every rupee back — and built real trust."</div>
           <div class="testimonial-author">
             <div class="testimonial-avatar" style="background:rgba(0,208,156,0.1);">🙌</div>
             <div><div class="testimonial-name">UniFi #0394</div><div class="testimonial-meta">BITS Pilani · Provider</div></div>
@@ -1004,7 +1004,7 @@ footer {
     </p>
     <div class="cta-buttons sr sr-delay-3">
       <a href="#" class="btn-cta-borrow">I want to Borrow</a>
-      <a href="#" class="btn-cta-lend">I want to Earn</a>
+      <a href="#" class="btn-cta-lend">I want to Lend</a>
     </div>
     <p class="cta-note sr sr-delay-4">
       No credit history needed <span>·</span> University email required <span>·</span> Free to join

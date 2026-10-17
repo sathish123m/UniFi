@@ -1,0 +1,26 @@
+# gitleaks configuration
+# https://github.com/gitleaks/gitleaks#configuration
+#
+# Extends the built-in rules and only exempts genuine placeholders — example
+# env files and documentation that intentionally show redacted shapes.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder-only files and obvious dummy values"
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.sample$''',
+  '''NOTES_FOR_USER\.md$''',
+  '''AUDIT_.*\.md$''',
+  '''docs/.*\.md$''',
+  '''README\.md$''',
+]
+regexes = [
+  '''PASTE_[A-Z_]+''',
+  '''X{8,}''',
+  '''placeholder''',
+  '''not-used''',
+  '''ci-.*-secret''',
+]

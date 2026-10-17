@@ -4,18 +4,21 @@ const prisma = require('../config/db')
 const { createId } = require('@paralleldrive/cuid2')
 
 // 1. CONFIGURATION SANITIZATION
-const cleanUser = String(process.env.SMTP_USER || 'unifi.campus@gmail.com').trim()
-const cleanPass = String(process.env.SMTP_PASS || 'ugijhnzsjhbqwmmb').replace(/\s+/g, '')
-const smtpHost = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim()
-const smtpPort = Number(process.env.SMTP_PORT || '465')
-const smtpFromAddress = process.env.SMTP_FROM || `${cleanUser}`
+const cleanUser = String(process.env.SMTP_USER || '').trim()
+const cleanPass = String(process.env.SMTP_PASS || '').replace(/\s+/g, '')
+const smtpHost = String(process.env.SMTP_HOST || '').trim()
+const smtpPort = Number(process.env.SMTP_PORT || '587')
+const smtpFromAddress = process.env.SMTP_FROM || cleanUser
 const smtpFromName = String(process.env.SMTP_FROM_NAME || 'UniFi').trim()
 const smtpFrom = smtpFromAddress.includes('<') ? smtpFromAddress : `${smtpFromName} <${smtpFromAddress}>`
 
 const isProduction = (process.env.NODE_ENV || 'development') === 'production'
 const strictEmailDelivery = String(process.env.SMTP_STRICT || (isProduction ? 'true' : 'false')).toLowerCase() === 'true'
+// Only disable TLS verification when explicitly opted-in for local dev. Never in production.
+const allowSelfSignedTls = !isProduction && String(process.env.SMTP_ALLOW_SELF_SIGNED || 'false').toLowerCase() === 'true'
+const smtpConfigured = Boolean(cleanUser && cleanPass && smtpHost)
 
-// 2. TRANSPORTER CREATION (ENFORCE PORT 465 DIRECT SSL WITH 3S TIMEOUT)
+// 2. TRANSPORTER CREATION
 const createGmailTransporter = () =>
   nodemailer.createTransport({
     host: 'smtp.gmail.com',
@@ -25,7 +28,7 @@ const createGmailTransporter = () =>
     connectionTimeout: 3000,
     greetingTimeout: 3000,
     socketTimeout: 5000,
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: !allowSelfSignedTls },
   })
 
 const createCustomTransporter = () =>
@@ -37,22 +40,26 @@ const createCustomTransporter = () =>
     connectionTimeout: 3000,
     greetingTimeout: 3000,
     socketTimeout: 5000,
-    tls: { rejectUnauthorized: false },
+    tls: { rejectUnauthorized: !allowSelfSignedTls },
   })
 
 // 3. SMTP TRANSMISSION WITH AUTOMATIC TRANSPORT RETRY
-const sendMailViaSmtp = async (mailOptions) => {
+const sendMailViaSmtp = async ({ to, subject, text, html }) => {
+  if (!smtpConfigured) {
+    throw new Error('SMTP not configured (SMTP_USER/SMTP_PASS/SMTP_HOST missing)')
+  }
+  const mailOptions = { from: smtpFrom, to, subject, text, html }
   const isGmail = /gmail\.com$/i.test(cleanUser) || /smtp\.gmail\.com/i.test(smtpHost)
-  
+
   // Strategy 1: Direct Gmail SSL Port 465
   if (isGmail) {
     try {
       const transporter = createGmailTransporter()
       const info = await transporter.sendMail(mailOptions)
-      logger.info(`SMTP direct delivery success to ${mailOptions.to} (messageId=${info.messageId || 'n/a'})`)
+      logger.info(`SMTP direct delivery success to ${to} (messageId=${info.messageId || 'n/a'})`)
       return info
     } catch (err) {
-      logger.warn(`SMTP Gmail 465 failed to ${mailOptions.to}: ${err.message}`)
+      logger.warn(`SMTP Gmail 465 failed to ${to}: ${err.message}`)
     }
   }
 
@@ -60,10 +67,10 @@ const sendMailViaSmtp = async (mailOptions) => {
   try {
     const transporter = createCustomTransporter()
     const info = await transporter.sendMail(mailOptions)
-    logger.info(`SMTP custom host delivery success to ${mailOptions.to} (messageId=${info.messageId || 'n/a'})`)
+    logger.info(`SMTP custom host delivery success to ${to} (messageId=${info.messageId || 'n/a'})`)
     return info
   } catch (err) {
-    logger.error(`SMTP custom host failed to ${mailOptions.to}: ${err.message}`)
+    logger.error(`SMTP custom host failed to ${to}: ${err.message}`)
     throw err
   }
 }
@@ -105,7 +112,7 @@ const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
       'api-key': brevoApiKey,
     },
     body: JSON.stringify({
-      sender: { email: cleanUser, name: smtpFromName },
+      sender: { email: smtpFromAddress, name: smtpFromName },
       to: [{ email: to }],
       subject,
       htmlContent: html,
@@ -119,6 +126,9 @@ const sendMailViaBrevoApi = async ({ to, subject, text, html }) => {
 }
 
 const sendMailViaMailjetApi = async ({ to, subject, text, html }) => {
+  // Only use Mailjet's own credentials. Never fall back to SMTP_USER/SMTP_PASS:
+  // sending an SMTP password as HTTP Basic auth to a different provider leaks
+  // the credential to a third party and always fails authentication.
   const key = String(process.env.MAILJET_API_KEY || '').trim()
   const secret = String(process.env.MAILJET_API_SECRET || '').trim()
   if (!key || !secret) throw new Error('MAILJET_API_KEY/SECRET not set')
@@ -131,7 +141,7 @@ const sendMailViaMailjetApi = async ({ to, subject, text, html }) => {
       Authorization: `Basic ${auth}`,
     },
     body: JSON.stringify({
-      Messages: [{ From: { Email: cleanUser, Name: smtpFromName }, To: [{ Email: to }], Subject: subject, TextPart: text, HTMLPart: html }],
+      Messages: [{ From: { Email: smtpFromAddress, Name: smtpFromName }, To: [{ Email: to }], Subject: subject, TextPart: text, HTMLPart: html }],
     }),
   })
   const raw = await res.text()
@@ -139,7 +149,59 @@ const sendMailViaMailjetApi = async ({ to, subject, text, html }) => {
   return { messageId: 'mailjet-sent', response: `Mailjet API ${res.status}` }
 }
 
-// 5. PRIMARY EMAIL DISPATCHER
+// 5. PROVIDER SELECTION
+// EMAIL_PROVIDER chooses which transport is tried FIRST; the others always
+// remain in the chain as automatic fallbacks so a single provider outage never
+// blocks OTP delivery. SMTP is the implicit default and is always kept.
+const EMAIL_SENDERS = {
+  SMTP: sendMailViaSmtp,
+  RESEND_API: sendMailViaResendApi,
+  BREVO_API: sendMailViaBrevoApi,
+  MAILJET_API: sendMailViaMailjetApi,
+}
+
+const providerOrder = () => {
+  const configured = String(process.env.EMAIL_PROVIDER || 'SMTP').trim().toUpperCase()
+  const preferred = EMAIL_SENDERS[configured] ? configured : 'SMTP'
+
+  // Only try providers whose own credentials exist. Blindly falling through
+  // the whole list wastes time and can leak/mix credentials across providers.
+  const hasCreds = {
+    SMTP: Boolean(String(process.env.SMTP_USER || '').trim() && String(process.env.SMTP_PASS || '').trim() && String(process.env.SMTP_HOST || '').trim()),
+    RESEND_API: Boolean(String(process.env.RESEND_API_KEY || '').trim()),
+    BREVO_API: Boolean(String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim()),
+    MAILJET_API: Boolean(String(process.env.MAILJET_API_KEY || '').trim() && String(process.env.MAILJET_API_SECRET || '').trim()),
+  }
+  const ready = ['SMTP', 'RESEND_API', 'BREVO_API', 'MAILJET_API'].filter((k) => hasCreds[k])
+  if (!ready.length) return [preferred]
+  return [preferred, ...ready.filter((k) => k !== preferred)]
+}
+
+// 5b. RETRY HELPER
+// Transient provider/network errors (DNS blips, 5xx) are common; retrying twice
+// with linear backoff meaningfully improves OTP delivery without hammering the
+// provider.
+const emailSendAttempts = Math.min(
+  Math.max(Number(process.env.EMAIL_SEND_RETRIES || 3), 1),
+  5
+)
+
+const withRetry = async (fn, attempts = emailSendAttempts, baseDelayMs = 250) => {
+  let lastErr
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, baseDelayMs * attempt))
+      }
+    }
+  }
+  throw lastErr
+}
+
+// 6. PRIMARY EMAIL DISPATCHER
 const sendOtpEmail = async (email, otp, purpose, options = {}) => {
   if (!email) return { sent: false, channel: 'email', error: 'missing_email' }
   const strict = Object.prototype.hasOwnProperty.call(options, 'strict') ? Boolean(options.strict) : strictEmailDelivery
@@ -162,50 +224,84 @@ const sendOtpEmail = async (email, otp, purpose, options = {}) => {
     </div>
   `
 
-  // Primary Dispatch: SMTP (Direct Gmail SSL)
-  try {
-    const info = await sendMailViaSmtp({ from: smtpFrom, to: email, subject, text, html })
-    return { sent: true, channel: 'email', provider: 'SMTP', response: info.response, messageId: info.messageId }
-  } catch (smtpErr) {
-    logger.warn(`Primary SMTP failed for ${email}: ${smtpErr.message}`)
+  // Try the configured provider first, then the remaining providers in turn.
+  const payload = { to: email, subject, text, html }
+  const order = providerOrder()
+  let lastErr = null
 
-    // Fallback 1: Resend API
+  for (let i = 0; i < order.length; i++) {
+    const key = order[i]
     try {
-      const info = await sendMailViaResendApi({ to: email, subject, text, html })
-      logger.info(`OTP sent to ${email} via Resend API fallback`)
-      return { sent: true, channel: 'email', provider: 'RESEND_API', response: info.response, messageId: info.messageId }
-    } catch (_rErr) {}
-
-    // Fallback 2: Brevo API
-    try {
-      const info = await sendMailViaBrevoApi({ to: email, subject, text, html })
-      logger.info(`OTP sent to ${email} via Brevo API fallback`)
-      return { sent: true, channel: 'email', provider: 'BREVO_API', response: info.response, messageId: info.messageId }
-    } catch (_bErr) {}
-
-    // Fallback 3: Mailjet API
-    try {
-      const info = await sendMailViaMailjetApi({ to: email, subject, text, html })
-      logger.info(`OTP sent to ${email} via Mailjet API fallback`)
-      return { sent: true, channel: 'email', provider: 'MAILJET_API', response: info.response, messageId: info.messageId }
-    } catch (_mErr) {}
-
-    if (strict) throw smtpErr
-    return { sent: false, channel: 'email', error: smtpErr.message }
+      const info = await withRetry(() => EMAIL_SENDERS[key](payload))
+      if (i > 0) logger.info(`OTP sent to ${email} via ${key} (fallback from ${order[0]})`)
+      return { sent: true, channel: 'email', provider: key, response: info.response, messageId: info.messageId }
+    } catch (e) {
+      lastErr = e
+      logger.warn(`Email via ${key} failed for ${email}: ${e.message}`)
+    }
   }
+
+  if (strict) throw lastErr || new Error('All email providers failed')
+  return { sent: false, channel: 'email', error: lastErr?.message || 'all_email_providers_failed' }
 }
 
-// 6. SMS DISPATCHER
+// 7. SMS DISPATCHER
+// Real SMS is opt-in via SMS_PROVIDER=TWILIO + credentials. Without them the
+// platform stays in mock mode (email OTP is the working channel) so a missing
+// Twilio account never blocks login.
+const smsProviderName = String(process.env.SMS_PROVIDER || 'MOCK').trim().toUpperCase()
+const twilioAccountSid = String(process.env.TWILIO_ACCOUNT_SID || '').trim()
+const twilioAuthToken = String(process.env.TWILIO_AUTH_TOKEN || '').trim()
+const twilioFromNumber = String(process.env.TWILIO_FROM_NUMBER || process.env.TWILIO_FROM || '').trim()
+const smsStrict = String(process.env.SMS_STRICT || 'false').toLowerCase() === 'true'
+const smsRealEnabled =
+  smsProviderName === 'TWILIO' && Boolean(twilioAccountSid && twilioAuthToken && twilioFromNumber)
+
 const sendOtpSms = async (phone, otp, purpose, options = {}) => {
   if (!phone) return { sent: false, channel: 'sms', error: 'missing_phone' }
-  logger.info(`Mock SMS OTP sent to ${phone}: ${otp} (${purpose})`)
-  return { sent: false, channel: 'sms', provider: 'MOCK', error: 'sms_mock_mode' }
+
+  // Never log the OTP value itself — logs are not a secure channel and a leaked
+  // OTP defeats email/2FA/reset security. Log only that an attempt was made.
+  if (!smsRealEnabled) {
+    logger.info(`Mock SMS OTP dispatch to ${phone} (${purpose})`)
+    return { sent: false, channel: 'sms', provider: 'MOCK', error: 'sms_mock_mode' }
+  }
+
+  const params = new URLSearchParams({
+    To: phone,
+    From: twilioFromNumber,
+    Body: `Your UniFi verification code is ${otp}. It expires in 10 minutes. Do not share it with anyone.`,
+  })
+  try {
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Authorization: `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+        },
+        body: params,
+      }
+    )
+    const raw = await res.text()
+    if (!res.ok) throw new Error(`Twilio ${res.status}: ${raw.slice(0, 180)}`)
+    const parsed = raw ? JSON.parse(raw) : null
+    return { sent: true, channel: 'sms', provider: 'TWILIO', messageId: parsed?.sid || null }
+  } catch (e) {
+    logger.warn(`SMS via TWILIO failed for ${phone}: ${e.message}`)
+    if (options.strict) throw e
+    return { sent: false, channel: 'sms', provider: 'TWILIO', error: e.message }
+  }
 }
 
 const sendOtpChannels = async ({ email, phone, otp, purpose }) => {
   const [emailResult, smsResult] = await Promise.all([
-    sendOtpEmail(email, otp, purpose, { strict: false }),
-    sendOtpSms(phone, otp, purpose, { strict: false }),
+    // strictEmailDelivery surfaces an explicit failure (instead of a silent
+    // "sent:false" record) so ops can detect a broken mail provider; the caller
+    // catches it and logs without blocking signup.
+    sendOtpEmail(email, otp, purpose, { strict: strictEmailDelivery }),
+    sendOtpSms(phone, otp, purpose, { strict: smsStrict }),
   ])
   return {
     sentAny: Boolean(emailResult?.sent || smsResult?.sent),
@@ -222,4 +318,4 @@ const createNotification = async (userId, type, title, body, data = {}) => {
   }
 }
 
-module.exports = { sendOtpEmail, sendOtpSms, sendOtpChannels, smsRealEnabled: false, createNotification }
+module.exports = { sendOtpEmail, sendOtpSms, sendOtpChannels, createNotification, smsRealEnabled, emailSendAttempts }

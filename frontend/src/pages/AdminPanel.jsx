@@ -11,21 +11,24 @@ const sections = [
   { key: 'loans', label: 'Requests & Loans' },
   { key: 'defaults', label: 'Repayments & Defaults' },
   { key: 'disputes', label: 'Disputes' },
+  { key: 'universities', label: 'Universities' },
   { key: 'policy', label: 'Policy Settings' },
   { key: 'audit', label: 'Audit Log' },
 ]
 
-const fmtINR = (n = 0) => `₹${Number(n).toLocaleString('en-IN')}`
+const fmtINR = (n = 0) => `₹${Number(n || 0).toLocaleString('en-IN')}`
 const dateLabel = (v) =>
   v ? new Date(v).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'
+const timeLabel = (v) =>
+  v ? new Date(v).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
 const cap = (s = '') => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 
 const pillClass = (s = '') => {
   const lower = s.toLowerCase()
-  if (['active', 'approved', 'resolved', 'good'].includes(lower)) return 'approved'
-  if (['pending', 'open', 'progress'].includes(lower)) return 'pending'
-  if (['overdue', 'rejected', 'suspended', 'bad', 'flagged'].includes(lower)) return 'rejected'
-  if (['completed', 'repaid', 'closed'].includes(lower)) return 'completed'
+  if (['active', 'approved', 'funded'].includes(lower)) return 'approved'
+  if (['pending'].includes(lower)) return 'pending'
+  if (['defaulted', 'rejected', 'cancelled'].includes(lower)) return 'rejected'
+  if (['repaid', 'closed'].includes(lower)) return 'completed'
   return 'pending'
 }
 
@@ -76,7 +79,6 @@ const S = {
       : type === 'rejected' ? { background: 'rgba(232,169,155,.32)', color: '#a13f2c' }
       : type === 'completed' ? { background: 'rgba(31,41,55,.08)', color: '#64748b' }
       : type === 'warn' ? { background: 'rgba(224,177,104,.2)', color: '#96712c' }
-      : type === 'good' ? { background: 'rgba(143,191,163,.22)', color: '#6fa98f' }
       : { background: 'rgba(31,41,55,.08)', color: '#64748b' }),
   }),
   approveBtn: { padding: '8px 16px', borderRadius: 100, background: '#8fbfa3', color: '#173829', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer' },
@@ -97,6 +99,13 @@ const S = {
   kycItem: { display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderBottom: '1px solid rgba(31,41,55,.08)' },
   kii: (done) => ({ width: 34, height: 34, borderRadius: 10, background: done ? 'rgba(143,191,163,.2)' : 'rgba(31,41,55,.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: done ? '#6fa98f' : '#64748b', fontSize: 14 }),
 }
+const EMPTY_POLICY = {
+  minLoanAmount: '', maxLoanAmount: '',
+  scoreTier1MinScore: '', scoreTier1Limit: '',
+  scoreTier2MinScore: '', scoreTier2Limit: '',
+  scoreTier3MinScore: '', scoreTier3Limit: '',
+  providerAcceptWindowHours: '', providerFundWindowHours: '',
+}
 
 export default function AdminPanel() {
   const { accessToken, user, logout } = useAuth()
@@ -106,62 +115,89 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const [stats, setStats] = useState(null)
   const [kycQueue, setKycQueue] = useState([])
   const [users, setUsers] = useState([])
   const [loans, setLoans] = useState([])
   const [auditLogs, setAuditLogs] = useState([])
+  const [collections, setCollections] = useState([])
+  const [config, setConfig] = useState(null)
+
+  // Disputes + multi-campus management
   const [disputes, setDisputes] = useState([])
+  const [universities, setUniversities] = useState([])
+  const [uniForm, setUniForm] = useState({ name: '', shortName: '', emailDomain: '', city: '', state: '' })
 
   // UI state
   const [loanTab, setLoanTab] = useState('all')
-  const [disputeTab, setDisputeTab] = useState('all')
   const [accountTab, setAccountTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [drawerUser, setDrawerUser] = useState(null)
-  const [limitInput, setLimitInput] = useState('')
-  const [limitMsg, setLimitMsg] = useState('')
+  const [rejectReason, setRejectReason] = useState('')
+  // Government ID numbers are masked by default so they are not shoulder-surfed
+  // or captured in screenshots during routine reviews. An admin must explicitly
+  // reveal them for a single drawer view.
+  const [revealPii, setRevealPii] = useState(false)
 
-  // Policy settings state
-  const [policy, setPolicy] = useState({
-    minRate: 3,
-    maxRate: 6,
-    maxLoanAmount: 15000,
-    maxActiveRequests: 2,
-    newBorrowerLimit: 5000,
-    after1stRepayLimit: 12000,
-    after3RepayLimit: 25000,
-    baseProviderLimit: 20000,
-    trustedProviderLimit: 50000,
-    requireIdCard: true,
-    requireCamera: true,
-    requireOtp: true,
-    requireUpi: true,
-    requireGuarantor: true,
-    requirePan: true,
-  })
+  // Policy form — hydrated from the live platform config
+  const [policy, setPolicy] = useState(EMPTY_POLICY)
+
+  const canWriteConfig = ['SUPER_ADMIN', 'FINANCE_ADMIN'].includes(user?.role)
+  const canReviewKyc = ['SUPER_ADMIN', 'MOD_ADMIN'].includes(user?.role)
+  const canViewUniversities = user?.role === 'SUPER_ADMIN'
+
+  // Only show nav items the signed-in admin is authorised to use.
+  const navSections = useMemo(
+    () => sections.filter((s) => {
+      if (s.key === 'universities') return canViewUniversities
+      return true
+    }),
+    [canViewUniversities],
+  )
+
+  const hydratePolicy = (cfg) => {
+    if (!cfg) return
+    setPolicy({
+      minLoanAmount: cfg.minLoanAmount,
+      maxLoanAmount: cfg.maxLoanAmount,
+      scoreTier1MinScore: cfg.scoreTier1MinScore,
+      scoreTier1Limit: cfg.scoreTier1Limit,
+      scoreTier2MinScore: cfg.scoreTier2MinScore,
+      scoreTier2Limit: cfg.scoreTier2Limit,
+      scoreTier3MinScore: cfg.scoreTier3MinScore,
+      scoreTier3Limit: cfg.scoreTier3Limit,
+      providerAcceptWindowHours: cfg.providerAcceptWindowHours,
+      providerFundWindowHours: cfg.providerFundWindowHours,
+    })
+  }
 
   const reload = async () => {
     setLoading(true)
     setError('')
     try {
-      const [s, k, u, l] = await Promise.all([
+      const [s, k, u, l, a, c, col, disp, uni] = await Promise.all([
         api.get('/admin/stats', accessToken),
         api.get('/admin/kyc/queue', accessToken),
         api.get('/admin/users', accessToken),
         api.get('/admin/loans', accessToken),
+        api.get('/admin/audit', accessToken).catch(() => ({ data: [] })),
+        api.get('/admin/config', accessToken).catch(() => ({ data: null })),
+        api.get('/admin/collections/queue', accessToken).catch(() => ({ data: [] })),
+        api.get('/admin/disputes', accessToken).catch(() => ({ data: [] })),
+        api.get('/admin/universities', accessToken).catch(() => ({ data: [] })),
       ])
       setStats(s.data)
       setKycQueue(k.data || [])
       setUsers(u.data?.users || [])
       setLoans(l.data?.loans || [])
-
-      // Build audit log from available data (mock enrichment)
-      setAuditLogs(l.data?.auditLog || [
-        { t: 'Just now', a: 'Admin session started' },
-        { t: dateLabel(new Date()), a: 'Loaded admin dashboard' },
-      ])
+      setAuditLogs(a.data || [])
+      setConfig(c.data || null)
+      setCollections(col.data || [])
+      setDisputes(disp.data || [])
+      setUniversities(uni.data || [])
+      hydratePolicy(c.data)
     } catch (err) {
       setError(err.message || 'Failed to load admin panel')
     } finally {
@@ -171,72 +207,117 @@ export default function AdminPanel() {
 
   useEffect(() => { reload() }, [])
 
-  const logAction = (text) => {
-    setAuditLogs(prev => [{ t: new Date().toLocaleTimeString('en-IN'), a: text }, ...prev])
+  useEffect(() => {
+    if (!drawerUser) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') { setDrawerUser(null); setRejectReason('') }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawerUser])
+
+  // Never keep a revealed ID number on screen after switching users.
+  useEffect(() => { setRevealPii(false) }, [drawerUser?.id])
+
+  const maskAadhaar = (value) => {
+    const digits = String(value || '').replace(/\D/g, '')
+    if (digits.length < 4) return '•••• •••• ••••'
+    return `•••• •••• ${digits.slice(-4)}`
+  }
+  const maskPan = (value) => {
+    const pan = String(value || '').toUpperCase()
+    if (pan.length < 4) return '••••••••••'
+    return `${pan.slice(0, 2)}••••••${pan.slice(-2)}`
   }
 
-  const handleApproveKyc = async (userId) => {
+  const flash = (msg) => { setMessage(msg); setError('') }
+
+  const handleKyc = async (userId, action) => {
+    setBusy(true)
     try {
-      await api.patch(`/admin/kyc/${userId}/approve`, {}, accessToken)
-      logAction(`Approved KYC for user #${userId}`)
-      setMessage('✓ KYC approved successfully.')
+      await api.patch(`/admin/kyc/${userId}`, {
+        action,
+        ...(action === 'REJECTED' && { reason: rejectReason || 'Documents unclear or incomplete' }),
+      }, accessToken)
+      flash(`KYC ${action === 'APPROVED' ? 'approved' : 'rejected'}.`)
+      setDrawerUser(null)
+      setRejectReason('')
       await reload()
-    } catch (err) { setError(err.message) }
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
   }
 
-  const handleRejectKyc = async (userId) => {
-    try {
-      await api.patch(`/admin/kyc/${userId}/reject`, { reason: 'Document unclear' }, accessToken)
-      logAction(`Rejected KYC for user #${userId}`)
-      setMessage('KYC rejected.')
-      await reload()
-    } catch (err) { setError(err.message) }
-  }
-
-  const handleUserStatus = async (userId, action, name) => {
+  const handleUserStatus = async (userId, action) => {
+    setBusy(true)
     try {
       await api.patch(`/admin/users/${userId}/status`, { action }, accessToken)
-      logAction(`${action === 'BAN' ? 'Suspended' : 'Reinstated'} account of ${name}`)
-      setMessage(`User account ${action === 'BAN' ? 'suspended' : 'reinstated'}.`)
+      const verb = action === 'RESTORE' ? 'restored' : action === 'BAN' ? 'banned' : 'suspended'
+      flash(`Account ${verb}.`)
+      setDrawerUser(null)
       await reload()
-    } catch (err) { setError(err.message) }
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
   }
 
-  const handleUpdateLimit = async (userId, name, role) => {
-    const val = parseInt(limitInput, 10) || 0
+  const handleRunSweep = async () => {
+    setBusy(true)
     try {
-      await api.patch(`/admin/users/${userId}/limit`, { limit: val }, accessToken).catch(() => {})
-      logAction(`Updated ${name}'s ${role === 'BORROWER' ? 'credit' : 'lending'} limit to ₹${val.toLocaleString('en-IN')}`)
-      setLimitMsg(`Limit updated to ₹${val.toLocaleString('en-IN')} for ${name}.`)
-      setMessage(`Limit updated for ${name}.`)
-    } catch (err) { setError(err.message) }
-  }
-
-  const handleSendReminder = (name) => {
-    logAction(`Sent repayment reminder to ${name}`)
-    setMessage(`Reminder sent to ${name}.`)
-  }
-
-  const handleRespondDispute = (name) => {
-    logAction(`Responded to dispute raised by ${name}`)
-    setMessage(`Response sent to ${name}.`)
-  }
-
-  const handleSavePolicy = () => {
-    logAction('Updated platform policy settings')
-    setMessage('✓ Policy settings saved.')
-  }
-
-  const handleForceMatch = async (loanId) => {
-    try {
-      await api.post(`/admin/loans/${loanId}/force-match`, {}, accessToken).catch(() => {})
-      logAction(`Force-matched loan #${loanId} to an available provider`)
-      setMessage('Loan manually matched to an available provider.')
+      const res = await api.post('/admin/collections/sweep', {}, accessToken)
+      const d = res.data || {}
+      flash(`Collections sweep complete — ${d.scanned ?? 0} loan(s) scanned, ${d.updated ?? 0} updated, ${d.defaulted ?? 0} newly defaulted.`)
       await reload()
-    } catch (err) {
-      setMessage('Force match initiated.')
-      logAction(`Force-matched loan #${loanId}`)
-    }
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+
+  const handleSaveConfig = async () => {
+    setBusy(true)
+    try {
+      const payload = {}
+      Object.entries(policy).forEach(([k, v]) => {
+        if (v === '' || v === null || v === undefined) return
+        payload[k] = Number(v)
+      })
+      const res = await api.post('/admin/config', payload, accessToken)
+      setConfig(res.data)
+      hydratePolicy(res.data)
+      flash('Platform configuration saved. New values apply to future loans.')
+      await reload()
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+
+  const handleForceActive = async (loanId) => {
+    setBusy(true)
+    try {
+      await api.post(`/admin/loans/${loanId}/force-active`, {}, accessToken)
+      flash('Loan marked active (handover confirmed offline).')
+      await reload()
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+
+  const handleForceRepaid = async (loanId) => {
+    setBusy(true)
+    try {
+      await api.post(`/admin/loans/${loanId}/force-repaid`, {}, accessToken)
+      flash('Loan marked repaid (repayment confirmed offline).')
+      await reload()
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+
+  const handleAddUniversity = async () => {
+    setBusy(true)
+    try {
+      await api.post('/admin/universities', uniForm, accessToken)
+      flash(`University "${uniForm.name}" added and open for signups.`)
+      setUniForm({ name: '', shortName: '', emailDomain: '', city: '', state: '' })
+      await reload()
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  }
+
+  const handleToggleUniversity = async (uni) => {
+    setBusy(true)
+    try {
+      await api.patch(`/admin/universities/${uni.id}`, { isActive: !uni.isActive }, accessToken)
+      flash(`${uni.name} ${uni.isActive ? 'disabled' : 'enabled'} for new signups.`)
+      await reload()
+    } catch (err) { setError(err.message) } finally { setBusy(false) }
   }
 
   const filteredUsers = useMemo(() => {
@@ -249,24 +330,29 @@ export default function AdminPanel() {
 
   const filteredLoans = useMemo(() => {
     if (loanTab === 'all') return loans
-    return loans.filter(l => l.status?.toLowerCase() === loanTab || (loanTab === 'pending' && l.status === 'PENDING') || (loanTab === 'active' && l.status === 'FUNDED') || (loanTab === 'overdue' && l.status === 'OVERDUE') || (loanTab === 'completed' && ['REPAID', 'CLOSED'].includes(l.status)) || (loanTab === 'rejected' && l.status === 'REJECTED'))
+    return loans.filter(l => l.status === loanTab)
   }, [loans, loanTab])
 
-  const overdueLoans = useMemo(() => loans.filter(l => l.status === 'OVERDUE' || l.isOverdue), [loans])
-  const pendingKycCount = kycQueue.length
-
+  const pendingKycCount = stats?.pendingKyc ?? kycQueue.length
   const pendingKycBadge = pendingKycCount > 0 ? pendingKycCount : null
+  const overdueCount = collections.length
 
   return (
     <>
       {/* Drawer Overlay */}
-      <div style={S.drawerOverlay(!!drawerUser)} onClick={() => { setDrawerUser(null); setLimitMsg('') }} />
+      <div style={S.drawerOverlay(!!drawerUser)} onClick={() => { setDrawerUser(null); setRejectReason('') }} />
 
       {/* Account Detail Drawer */}
-      <aside style={S.drawer(!!drawerUser)}>
+      <aside
+        style={S.drawer(!!drawerUser)}
+        role="dialog"
+        aria-modal="true"
+        aria-label={drawerUser ? `Account details for ${drawerUser.firstName || ''} ${drawerUser.lastName || ''}`.trim() : 'Account details'}
+        aria-hidden={!drawerUser}
+      >
         {drawerUser && (
           <>
-            <button onClick={() => { setDrawerUser(null); setLimitMsg('') }} style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(31,41,55,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, border: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
+            <button onClick={() => { setDrawerUser(null); setRejectReason('') }} style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(31,41,55,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18, border: 'none', cursor: 'pointer', fontSize: 16 }}>✕</button>
 
             {/* Drawer Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -275,78 +361,119 @@ export default function AdminPanel() {
               </div>
               <div>
                 <h3 style={{ fontSize: 18, margin: 0 }}>{drawerUser.firstName} {drawerUser.lastName}</h3>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{drawerUser.university?.name || 'NIT Campus'} · Joined {dateLabel(drawerUser.createdAt)}</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  {drawerUser.university?.name || drawerUser.university?.shortName || 'University not linked'}
+                  {drawerUser.createdAt ? ` · Joined ${dateLabel(drawerUser.createdAt)}` : ''}
+                </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-              <span style={S.pill(drawerUser.role?.toLowerCase())}>{drawerUser.role}</span>
+              {drawerUser.role && <span style={S.pill(drawerUser.role?.toLowerCase())}>{drawerUser.role}</span>}
               <span style={S.pill(pillClass(drawerUser.kycStatus || 'pending'))}>KYC {cap(drawerUser.kycStatus || 'PENDING')}</span>
-              <span style={S.pill(drawerUser.isBanned ? 'rejected' : 'approved')}>{drawerUser.isBanned ? 'Suspended' : 'Active'}</span>
+              <span style={S.pill(drawerUser.isBanned || drawerUser.isSuspended ? 'rejected' : 'approved')}>
+                {drawerUser.isBanned ? 'Banned' : drawerUser.isSuspended ? 'Suspended' : 'Active'}
+              </span>
             </div>
 
             {/* Contact & Profile */}
             <div style={S.drawerCard}>
-              <h4 style={{ fontSize: 13.5, marginBottom: 8 }}>Contact & Profile</h4>
+              <h4 style={{ fontSize: 13.5, marginBottom: 8 }}>Contact & profile</h4>
               <div style={S.balRow}><span style={{ color: '#64748b' }}>Email</span><b style={{ fontWeight: 500 }}>{drawerUser.email}</b></div>
               <div style={S.balRow}><span style={{ color: '#64748b' }}>Phone</span><b style={{ fontWeight: 500 }}>{drawerUser.phone || 'Not provided'}</b></div>
-              <div style={{ ...S.balRow, borderBottom: 'none' }}><span style={{ color: '#64748b' }}>Student ID</span><b style={{ fontWeight: 500 }}>{drawerUser.collegeIdNum || 'N/A'}</b></div>
+              <div style={S.balRow}><span style={{ color: '#64748b' }}>Student ID</span><b style={{ fontWeight: 500 }}>{drawerUser.studentIdNumber || 'N/A'}</b></div>
+              {typeof drawerUser.creditScore === 'number' && (
+                <div style={S.balRow}><span style={{ color: '#64748b' }}>Credit score</span><b style={{ fontWeight: 500 }}>{drawerUser.creditScore}</b></div>
+              )}
+              {typeof drawerUser.borrowLimit === 'number' && (
+                <div style={{ ...S.balRow, borderBottom: 'none' }}><span style={{ color: '#64748b' }}>Borrow limit</span><b style={{ fontWeight: 500 }}>{fmtINR(drawerUser.borrowLimit)}</b></div>
+              )}
             </div>
 
-            {/* KYC Checklist */}
-            <div style={S.drawerCard}>
-              <h4 style={{ fontSize: 13.5, marginBottom: 8 }}>KYC Checklist</h4>
-              {[
-                ['University email', true],
-                ['ID card uploaded', !!drawerUser.collegeIdNum],
-                ['Aadhaar / PAN', !!drawerUser.aadhaarNum || !!drawerUser.panNum],
-                ['Phone OTP', !!drawerUser.phone],
-                ['UPI linked', !!drawerUser.upiId],
-                ['Agreement signed', drawerUser.kycStatus === 'APPROVED'],
-              ].map(([label, done]) => (
-                <div key={label} style={S.kycItem}>
-                  <div style={S.kii(done)}>{done ? '✓' : '○'}</div>
-                  <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div></div>
-                  <span style={S.pill(done ? 'approved' : 'pending')}>{done ? 'Done' : 'Pending'}</span>
+            {/* KYC documents — only shown when the record carries document data */}
+            {drawerUser.kycDocument && (
+              <div style={S.drawerCard}>
+                <h4 style={{ fontSize: 13.5, marginBottom: 8 }}>KYC documents</h4>
+                {[
+                  ['Student ID (front)', !!drawerUser.kycDocument.studentIdFrontKey],
+                  ['Student ID (back)', !!drawerUser.kycDocument.studentIdBackKey],
+                  ['Live selfie', !!drawerUser.kycDocument.selfieKey],
+                  ['Aadhaar (front)', !!drawerUser.kycDocument.aadhaarFrontKey],
+                  ['Aadhaar (back)', !!drawerUser.kycDocument.aadhaarBackKey],
+                  ['PAN card', !!drawerUser.kycDocument.panDocKey],
+                ].map(([label, done]) => (
+                  <div key={label} style={S.kycItem}>
+                    <div style={S.kii(done)}>{done ? '✓' : '○'}</div>
+                    <div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div></div>
+                    <span style={S.pill(done ? 'approved' : 'pending')}>{done ? 'Uploaded' : 'Missing'}</span>
+                  </div>
+                ))}
+                {(drawerUser.kycDocument.aadhaarNumber || drawerUser.kycDocument.panNumber) && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(31,41,55,.08)' }}>
+                    {drawerUser.kycDocument.aadhaarNumber && (
+                      <div style={S.balRow}>
+                        <span style={{ color: '#64748b' }}>Aadhaar no.</span>
+                        <b style={{ fontWeight: 500, fontFamily: 'IBM Plex Mono, monospace' }}>
+                          {revealPii ? drawerUser.kycDocument.aadhaarNumber : maskAadhaar(drawerUser.kycDocument.aadhaarNumber)}
+                        </b>
+                      </div>
+                    )}
+                    {drawerUser.kycDocument.panNumber && (
+                      <div style={{ ...S.balRow, borderBottom: 'none' }}>
+                        <span style={{ color: '#64748b' }}>PAN</span>
+                        <b style={{ fontWeight: 500, fontFamily: 'IBM Plex Mono, monospace' }}>
+                          {revealPii ? drawerUser.kycDocument.panNumber : maskPan(drawerUser.kycDocument.panNumber)}
+                        </b>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setRevealPii((v) => !v)}
+                      style={{ marginTop: 8, background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: 12, padding: 0 }}
+                    >
+                      {revealPii ? 'Hide full ID numbers' : 'Reveal full ID numbers'}
+                    </button>
+                  </div>
+                )}
+                <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 8 }}>
+                  Submitted {dateLabel(drawerUser.kycDocument.submittedAt)} · format-validated on submission
                 </div>
-              ))}
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                <button style={S.approveBtn} onClick={() => { handleApproveKyc(drawerUser.id); setDrawerUser(null) }}>Approve KYC</button>
-                <button style={S.declineBtn} onClick={() => { handleRejectKyc(drawerUser.id); setDrawerUser(null) }}>Reject KYC</button>
               </div>
-            </div>
+            )}
 
-            {/* Limit Override */}
-            <div style={S.drawerCard}>
-              <h4 style={{ fontSize: 13.5, marginBottom: 8 }}>{drawerUser.role === 'BORROWER' ? 'Credit' : 'Lending'} Limit Override</h4>
-              <label style={S.fieldLabel}>LIMIT (₹)</label>
-              <input style={S.input} type="number" value={limitInput} onChange={e => setLimitInput(e.target.value)} placeholder={fmtINR(drawerUser.borrowLimit || drawerUser.lendLimit || 5000)} />
-              <button style={{ ...S.darkBtn, marginTop: 12 }} onClick={() => handleUpdateLimit(drawerUser.id, `${drawerUser.firstName} ${drawerUser.lastName}`, drawerUser.role)}>
-                Update limit
-              </button>
-              {limitMsg && <p style={{ fontSize: 12, color: '#6fa98f', marginTop: 8 }}>{limitMsg}</p>}
-              <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 10 }}>Credit score: {drawerUser.creditScore || 750}</div>
-            </div>
+            {/* KYC review actions */}
+            {canReviewKyc && drawerUser.kycStatus === 'PENDING' && (
+              <div style={S.drawerCard}>
+                <h4 style={{ fontSize: 13.5, marginBottom: 8 }}>Review KYC</h4>
+                <label style={S.fieldLabel}>REJECTION REASON (optional)</label>
+                <input style={S.input} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Shown to the applicant if rejected" />
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button style={S.approveBtn} disabled={busy} onClick={() => handleKyc(drawerUser.id, 'APPROVED')}>Approve KYC</button>
+                  <button style={S.declineBtn} disabled={busy} onClick={() => handleKyc(drawerUser.id, 'REJECTED')}>Reject KYC</button>
+                </div>
+              </div>
+            )}
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-              <button style={S.outlineBtn} onClick={() => handleUserStatus(drawerUser.id, drawerUser.isBanned ? 'RESTORE' : 'BAN', `${drawerUser.firstName} ${drawerUser.lastName}`)}>
-                {drawerUser.isBanned ? 'Reinstate account' : 'Suspend account'}
-              </button>
-              <button style={S.outlineBtn} onClick={() => { logAction(`Flagged ${drawerUser.firstName} ${drawerUser.lastName} as defaulter`); setMessage('User flagged as defaulter.') }}>
-                Flag as defaulter
-              </button>
-              <button style={S.outlineBtn} onClick={() => { logAction(`Sent password reset to ${drawerUser.email}`); setMessage('Password reset link sent.') }}>
-                Reset password
-              </button>
-            </div>
+            {/* Account status actions */}
+            {canReviewKyc && drawerUser.role && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+                {drawerUser.isBanned || drawerUser.isSuspended ? (
+                  <button style={S.outlineBtn} disabled={busy} onClick={() => handleUserStatus(drawerUser.id, 'RESTORE')}>Reinstate account</button>
+                ) : (
+                  <>
+                    <button style={S.outlineBtn} disabled={busy} onClick={() => handleUserStatus(drawerUser.id, 'SUSPEND')}>Suspend account</button>
+                    <button style={S.declineBtn} disabled={busy} onClick={() => handleUserStatus(drawerUser.id, 'BAN')}>Ban account</button>
+                  </>
+                )}
+              </div>
+            )}
           </>
         )}
       </aside>
 
       <AppShell
         baseRoute="/admin"
-        sections={sections}
+        sections={navSections}
         onLogout={logout}
         user={user}
         badgeCounts={{ kyc: pendingKycBadge }}
@@ -361,55 +488,40 @@ export default function AdminPanel() {
         {/* ===== 1. OVERVIEW ===== */}
         {!loading && activeSection === 'overview' && (
           <section>
-            {/* Stats Row */}
             <div style={S.statGrid}>
               <div style={S.statCard}>
                 <div style={S.statLabel}>Total accounts</div>
-                <div style={S.statValue}>{users.length || 0}</div>
-                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>
-                  {users.filter(u => u.role === 'BORROWER').length} borrowers · {users.filter(u => u.role === 'PROVIDER').length} providers
-                </div>
+                <div style={S.statValue}>{stats?.users ?? 0}</div>
+                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>Borrowers &amp; providers</div>
               </div>
               <div style={S.statCard}>
-                <div style={S.statLabel}>Total disbursed</div>
-                <div style={S.statValue}>{fmtINR(stats?.totalVolume || 0)}</div>
-                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>Across {loans.length} requests</div>
+                <div style={S.statLabel}>Loan requests (all time)</div>
+                <div style={S.statValue}>{stats?.loans ?? 0}</div>
+                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>{stats?.activeLoan ?? 0} currently active</div>
+              </div>
+              <div style={S.statCard}>
+                <div style={S.statLabel}>Open disputes</div>
+                <div style={{ ...S.statValue, color: (stats?.disputes ?? 0) > 0 ? '#a13f2c' : undefined }}>{stats?.disputes ?? 0}</div>
+                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>Flagged by a borrower or lender</div>
               </div>
               <div style={S.statCard}>
                 <div style={S.statLabel}>Pending KYC reviews</div>
-                <div style={{ ...S.statValue, color: pendingKycCount > 0 ? '#96712c' : '#1f2937' }}>{pendingKycCount}</div>
-                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>Avg. wait: same day</div>
-              </div>
-              <div style={S.statCard}>
-                <div style={S.statLabel}>Overdue repayments</div>
-                <div style={{ ...S.statValue, color: overdueLoans.length > 0 ? '#a13f2c' : '#1f2937' }}>{overdueLoans.length}</div>
-                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>Click to view</div>
+                <div style={{ ...S.statValue, color: pendingKycCount > 0 ? '#96712c' : undefined }}>{pendingKycCount}</div>
+                <div style={{ fontSize: 11.5, color: '#94a3ae', marginTop: 6 }}>{overdueCount} loan(s) overdue</div>
               </div>
             </div>
 
-            {/* Content Grid */}
             <div style={S.grid2}>
-              {/* Disbursal Chart */}
-              <div style={S.card}>
-                <h4 style={{ fontSize: 15, marginBottom: 8 }}>Disbursal activity — last 6 weeks</h4>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 110, marginTop: 26, padding: '0 4px' }}>
-                  {[42, 58, 51, 74, 66, 88].map((h, i) => (
-                    <div key={i} style={{ flex: 1, background: 'linear-gradient(180deg,#e8a99b,#d99686)', borderRadius: '6px 6px 2px 2px', height: `${h}%`, position: 'relative', minHeight: 6 }}>
-                      <span style={{ position: 'absolute', bottom: -22, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#94a3ae' }}>W{i + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Needs Attention */}
               <div style={S.card}>
                 <h4 style={{ fontSize: 15, marginBottom: 12 }}>Needs attention</h4>
                 <div>
                   {[
                     { label: 'Pending KYC reviews', val: pendingKycCount, color: '#96712c', sec: 'kyc' },
-                    { label: 'Overdue repayments', val: overdueLoans.length, color: '#a13f2c', sec: 'defaults' },
-                    { label: 'Total loans active', val: loans.filter(l => ['FUNDED', 'ACTIVE'].includes(l.status)).length, color: '#96712c', sec: 'loans' },
-                    { label: 'Registered accounts', val: users.length, color: '#1f2937', sec: 'accounts' },
+                    { label: 'Overdue / defaulted loans', val: overdueCount, color: '#a13f2c', sec: 'defaults' },
+                    { label: 'Open disputes', val: stats?.disputes ?? 0, color: '#a13f2c', sec: 'disputes' },
+                    { label: 'Active loans', val: stats?.activeLoan ?? 0, color: '#96712c', sec: 'loans' },
+                    { label: 'Total accounts', val: stats?.users ?? 0, color: '#1f2937', sec: 'accounts' },
                   ].map(item => (
                     <div key={item.label} onClick={() => setActiveSection(item.sec)} style={{ ...S.balRow, cursor: 'pointer' }}>
                       <span style={{ color: '#64748b' }}>{item.label}</span>
@@ -418,14 +530,32 @@ export default function AdminPanel() {
                   ))}
                 </div>
               </div>
+
+              {/* Recent admin activity — real audit log */}
+              <div style={S.card}>
+                <h4 style={{ fontSize: 15, marginBottom: 6 }}>Recent admin activity</h4>
+                {auditLogs.length === 0 && <p style={{ color: '#94a3ae', fontSize: 13 }}>No audit entries yet.</p>}
+                {auditLogs.slice(0, 5).map((log, i) => (
+                  <div key={log.id || i} style={{ ...S.actRow, ...(i === Math.min(auditLogs.length, 5) - 1 ? { borderBottom: 'none' } : {}) }}>
+                    <div style={S.actIc(true)}>✓</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13.3, fontWeight: 500 }}>{log.description || log.action}</div>
+                      <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 2 }}>
+                        {log.admin?.firstName || log.admin?.email || 'Admin'} · {timeLabel(log.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button style={{ ...S.outlineBtn, marginTop: 14 }} onClick={() => setActiveSection('audit')}>View full audit log</button>
+              </div>
             </div>
 
             {/* Quick Actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
               {[
                 { icon: '🆔', label: 'Review KYC queue', sec: 'kyc' },
                 { icon: '👥', label: 'View all accounts', sec: 'accounts' },
-                { icon: '💬', label: 'Open disputes', sec: 'disputes' },
+                { icon: '📄', label: 'Requests & loans', sec: 'loans' },
                 { icon: '⚙️', label: 'Policy settings', sec: 'policy' },
               ].map(qa => (
                 <button key={qa.sec} onClick={() => setActiveSection(qa.sec)} style={{ background: '#fff', borderRadius: 16, padding: 18, boxShadow: '0 20px 40px -26px rgba(31,41,55,.22)', display: 'flex', flexDirection: 'column', gap: 10, border: 'none', cursor: 'pointer', textAlign: 'left' }}>
@@ -433,21 +563,6 @@ export default function AdminPanel() {
                   <span style={{ fontSize: 13.2, fontWeight: 700 }}>{qa.label}</span>
                 </button>
               ))}
-            </div>
-
-            {/* Recent Activity */}
-            <div style={S.card}>
-              <h4 style={{ fontSize: 15, marginBottom: 6 }}>Recent admin activity</h4>
-              {auditLogs.slice(0, 4).map((log, i) => (
-                <div key={i} style={{ ...S.actRow, ...(i === auditLogs.length - 1 ? { borderBottom: 'none' } : {}) }}>
-                  <div style={S.actIc(i < 2)}>✓</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.3, fontWeight: 500 }}>{log.a}</div>
-                    <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 2 }}>{log.t}</div>
-                  </div>
-                </div>
-              ))}
-              <button style={{ ...S.outlineBtn, marginTop: 14 }} onClick={() => setActiveSection('audit')}>View full audit log</button>
             </div>
           </section>
         )}
@@ -460,7 +575,7 @@ export default function AdminPanel() {
                 <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94a3ae' }}>🔍</span>
                 <input
                   type="text"
-                  placeholder="Search by name, email or student ID…"
+                  placeholder="Search by name or email…"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   style={{ width: '100%', padding: '11px 16px 11px 40px', borderRadius: 100, background: '#fff', border: '1.5px solid rgba(31,41,55,.08)', fontSize: 13.5, fontFamily: 'Inter', color: '#1f2937', boxSizing: 'border-box' }}
@@ -482,20 +597,19 @@ export default function AdminPanel() {
                     <div style={{ fontWeight: 700, fontSize: 13.6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {u.firstName} {u.lastName}
                       <span style={S.pill(u.role?.toLowerCase())}>{u.role}</span>
-                      {u.isBanned && <span style={S.pill('rejected')}>Suspended</span>}
+                      {u.isBanned && <span style={S.pill('rejected')}>Banned</span>}
+                      {!u.isBanned && u.isSuspended && <span style={S.pill('rejected')}>Suspended</span>}
                     </div>
                     <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
-                      {u.email} · KYC {cap(u.kycStatus || 'PENDING')}
+                      {u.email} · Score {u.creditScore ?? '—'}
                     </div>
                   </div>
-                  <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, color: '#64748b', flexShrink: 0, minWidth: 84, textAlign: 'right' }}>
-                    {fmtINR(u.borrowLimit || u.lendLimit || 0)}
-                  </div>
                   <span style={{ ...S.pill(pillClass(u.kycStatus || 'pending')), margin: '0 10px' }}>{cap(u.kycStatus || 'PENDING')}</span>
-                  <button style={S.outlineBtn} onClick={() => { setDrawerUser(u); setLimitInput(u.borrowLimit || u.lendLimit || '') }}>Review</button>
+                  <button style={S.outlineBtn} onClick={() => setDrawerUser(u)}>Review</button>
                 </div>
               ))}
             </div>
+            <p style={{ fontSize: 11.5, color: '#94a3ae' }}>Showing the most recent {users.length} accounts.</p>
           </section>
         )}
 
@@ -519,13 +633,17 @@ export default function AdminPanel() {
                       <span style={S.pill(item.role?.toLowerCase())}>{item.role}</span>
                     </div>
                     <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
-                      Submitted · ID {item.collegeIdNum ? '✓' : '—'} · Aadhaar {item.aadhaarNum ? '✓' : '—'} · Phone {item.phone ? '✓' : '—'}
+                      {item.email} · ID {item.kycDocument?.studentIdFrontKey ? '✓' : '—'} · Selfie {item.kycDocument?.selfieKey ? '✓' : '—'} · Aadhaar {item.kycDocument?.aadhaarFrontKey ? '✓' : '—'} · PAN {item.kycDocument?.panDocKey ? '✓' : '—'}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={S.declineBtn} onClick={() => handleRejectKyc(item.id)}>Reject</button>
-                    <button style={S.approveBtn} onClick={() => handleApproveKyc(item.id)}>Approve</button>
-                    <button style={S.outlineBtn} onClick={() => { setDrawerUser(item); setLimitInput('') }}>Details</button>
+                    {canReviewKyc && (
+                      <>
+                        <button style={S.declineBtn} disabled={busy} onClick={() => handleKyc(item.id, 'REJECTED')}>Reject</button>
+                        <button style={S.approveBtn} disabled={busy} onClick={() => handleKyc(item.id, 'APPROVED')}>Approve</button>
+                      </>
+                    )}
+                    <button style={S.outlineBtn} onClick={() => setDrawerUser(item)}>Details</button>
                   </div>
                 </div>
               ))}
@@ -539,11 +657,12 @@ export default function AdminPanel() {
             <div style={S.segTabs}>
               {[
                 { key: 'all', label: 'All' },
-                { key: 'pending', label: 'Pending match' },
-                { key: 'active', label: 'Active' },
-                { key: 'overdue', label: 'Overdue' },
-                { key: 'completed', label: 'Completed' },
-                { key: 'rejected', label: 'Rejected' },
+                { key: 'PENDING', label: 'Pending match' },
+                { key: 'FUNDED', label: 'Funded' },
+                { key: 'ACTIVE', label: 'Active' },
+                { key: 'REPAID', label: 'Repaid' },
+                { key: 'DEFAULTED', label: 'Defaulted' },
+                { key: 'CANCELLED', label: 'Cancelled' },
               ].map(t => (
                 <button key={t.key} style={S.segTab(loanTab === t.key)} onClick={() => setLoanTab(t.key)}>{t.label}</button>
               ))}
@@ -553,97 +672,73 @@ export default function AdminPanel() {
               <div style={{ ...S.card, textAlign: 'center', color: '#94a3ae', padding: 30 }}>No loans found for this filter.</div>
             )}
 
-            {filteredLoans.map(loan => {
-              const statusLower = loan.status?.toLowerCase()
-              const isPending = loan.status === 'PENDING'
-              return (
-                <div key={loan.id} style={{ ...S.card, marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <div style={{ flex: 1, minWidth: 200 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.6 }}>{loan.purpose || 'Loan Request'}</div>
-                      <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
-                        {loan.borrower?.firstName || 'Student'} {loan.borrower?.lastName || ''} → {loan.provider?.firstName ? `${loan.provider.firstName} ${loan.provider.lastName}` : 'awaiting a provider match'} · {dateLabel(loan.dueDate)}
-                      </div>
+            {filteredLoans.map(loan => (
+              <div key={loan.id} style={{ ...S.card, marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.6 }}>
+                      {cap(loan.purpose || 'Loan request')} · <span style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#94a3ae' }}>{loan.publicId || loan.id.slice(0, 8)}</span>
                     </div>
-                    <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, color: '#64748b', flexShrink: 0 }}>{fmtINR(loan.principalAmount)}</div>
-                    <span style={{ ...S.pill(pillClass(loan.status)), margin: '0 10px' }}>{cap(loan.status || 'PENDING')}</span>
-                    {isPending ? (
-                      <button style={S.outlineBtn} onClick={() => handleForceMatch(loan.id)}>Force match</button>
-                    ) : (
-                      <button style={S.outlineBtn} onClick={() => { setDrawerUser(loan.borrower); setLimitInput('') }}>View</button>
-                    )}
+                    <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
+                      {loan.borrower?.firstName || 'Borrower'} → {loan.provider?.firstName ? loan.provider.firstName : 'awaiting a provider'}
+                      {loan.dueAt ? ` · Due ${dateLabel(loan.dueAt)}` : ''}
+                    </div>
                   </div>
+                  <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 13, color: '#64748b', flexShrink: 0 }}>{fmtINR(loan.principalAmount)}</div>
+                  <span style={{ ...S.pill(pillClass(loan.status)), margin: '0 10px' }}>{cap(loan.status || 'PENDING')}</span>
                 </div>
-              )
-            })}
+              </div>
+            ))}
+            <p style={{ fontSize: 11.5, color: '#94a3ae' }}>Showing the most recent {loans.length} requests.</p>
           </section>
         )}
 
         {/* ===== 5. REPAYMENTS & DEFAULTS ===== */}
         {!loading && activeSection === 'defaults' && (
           <section>
+            <div style={S.secHead}>
+              <h2 style={{ fontSize: 17 }}>Collections & delinquency</h2>
+              {canWriteConfig && (
+                <button style={S.darkBtn} disabled={busy} onClick={handleRunSweep}>Run collections sweep</button>
+              )}
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
               <div style={S.statCard}>
-                <div style={S.statLabel}>Total outstanding (platform-wide)</div>
-                <div style={S.statValue}>{fmtINR(stats?.totalOutstanding || 0)}</div>
+                <div style={S.statLabel}>Overdue / defaulted loans</div>
+                <div style={{ ...S.statValue, color: overdueCount > 0 ? '#a13f2c' : undefined }}>{overdueCount}</div>
               </div>
               <div style={S.statCard}>
-                <div style={S.statLabel}>Overdue repayments</div>
-                <div style={{ ...S.statValue, color: '#a13f2c' }}>{overdueLoans.length}</div>
+                <div style={S.statLabel}>Marked defaulted</div>
+                <div style={{ ...S.statValue, color: '#96712c' }}>{collections.filter(l => l.status === 'DEFAULTED').length}</div>
               </div>
               <div style={S.statCard}>
-                <div style={S.statLabel}>Default rate (30+ days)</div>
+                <div style={S.statLabel}>Default rate (of all loans)</div>
                 <div style={{ ...S.statValue, color: '#96712c' }}>
-                  {loans.length > 0 ? ((overdueLoans.length / loans.length) * 100).toFixed(1) : '0.0'}%
+                  {stats?.loans > 0 ? ((collections.filter(l => l.status === 'DEFAULTED').length / stats.loans) * 100).toFixed(1) : '0.0'}%
                 </div>
               </div>
             </div>
 
-            <div style={S.secHead}><h2 style={{ fontSize: 17 }}>Overdue repayments</h2></div>
-            <div style={{ ...S.card, marginBottom: 20 }}>
-              {overdueLoans.length === 0 && (
-                <p style={{ fontSize: 13, color: '#94a3ae', padding: '12px 4px' }}>No overdue repayments. 🎉</p>
-              )}
-              {overdueLoans.map((loan, i) => (
-                <div key={loan.id} style={{ ...S.acctRow, ...(i === overdueLoans.length - 1 ? { borderBottom: 'none' } : {}) }}>
-                  <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13.6 }}>
-                      {loan.borrower?.firstName || 'Borrower'} owes {loan.provider?.firstName || 'Provider'}
-                    </div>
-                    <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
-                      {fmtINR(loan.principalAmount)} · Due {dateLabel(loan.dueDate)}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={S.outlineBtn} onClick={() => handleSendReminder(`${loan.borrower?.firstName || 'Borrower'}`)}>
-                      Send reminder
-                    </button>
-                    <button style={S.declineBtn} onClick={() => { logAction(`Escalated loan #${loan.id} to collections`); setMessage('Escalated to collections review.') }}>
-                      Escalate
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={S.secHead}><h2 style={{ fontSize: 17 }}>Defaulter watchlist</h2></div>
             <div style={S.card}>
-              {overdueLoans.length === 0 && (
-                <p style={{ fontSize: 13, color: '#94a3ae', padding: '12px 4px' }}>No defaulters on record.</p>
+              {collections.length === 0 && (
+                <p style={{ fontSize: 13, color: '#94a3ae', padding: '12px 4px' }}>No overdue or defaulted loans. 🎉</p>
               )}
-              {overdueLoans.map((loan, i) => (
-                <div key={`d-${loan.id}`} style={{ ...S.acctRow, ...(i === overdueLoans.length - 1 ? { borderBottom: 'none' } : {}) }}>
+              {collections.map((loan, i) => (
+                <div key={loan.id} style={{ ...S.acctRow, ...(i === collections.length - 1 ? { borderBottom: 'none' } : {}) }}>
                   <div style={S.acctAvatar}>{loan.borrower?.firstName?.[0]}{loan.borrower?.lastName?.[0]}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 13.6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 180 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       {loan.borrower?.firstName} {loan.borrower?.lastName}
-                      <span style={S.pill('borrower')}>Borrower</span>
+                      <span style={S.pill(pillClass(loan.status))}>{cap(loan.status)}</span>
                     </div>
                     <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
-                      {fmtINR(loan.principalAmount)} overdue · Due {dateLabel(loan.dueDate)}
+                      {fmtINR(loan.principalAmount)} · Due {dateLabel(loan.dueAt)} · {loan.overdueDays || 0} day(s) overdue
                     </div>
                   </div>
-                  <button style={S.outlineBtn} onClick={() => { setDrawerUser(loan.borrower); setLimitInput('') }}>View account</button>
+                  {loan.borrower?.id && (
+                    <button style={S.outlineBtn} onClick={() => setDrawerUser(loan.borrower)}>View borrower</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -653,172 +748,197 @@ export default function AdminPanel() {
         {/* ===== 6. DISPUTES ===== */}
         {!loading && activeSection === 'disputes' && (
           <section>
-            <div style={S.segTabs}>
-              {['all', 'open', 'progress', 'resolved'].map(t => (
-                <button key={t} style={S.segTab(disputeTab === t)} onClick={() => setDisputeTab(t)}>
-                  {t === 'progress' ? 'In progress' : cap(t)}
-                </button>
+            <div style={S.card}>
+              <h4 style={{ fontSize: 15, marginBottom: 4 }}>Disputed loans</h4>
+              <p style={{ fontSize: 12.4, color: '#94a3ae', marginBottom: 12 }}>
+                A borrower or lender flagged these. UniFi moves no money, so resolution is mediation and recording:
+                confirm the handover or the repayment offline, then set the loan to the correct state below.
+              </p>
+              {disputes.length === 0 && <p style={{ color: '#94a3ae', fontSize: 13 }}>No disputes.</p>}
+              {disputes.map((loan, i) => (
+                <div key={loan.id} style={{ ...S.acctRow, alignItems: 'flex-start', ...(i === disputes.length - 1 ? { borderBottom: 'none' } : {}) }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{loan.publicId} · {fmtINR(loan.principalAmount)} · {cap(loan.status || '')}</div>
+                    <div style={{ fontSize: 11.6, color: '#94a3ae', marginTop: 2 }}>
+                      {loan.borrower?.email || 'borrower'} ⇄ {loan.provider?.email || 'lender'}
+                    </div>
+                    {loan.disputeReason && <div style={{ fontSize: 12, color: '#a13f2c', marginTop: 6 }}>“{loan.disputeReason}”</div>}
+                    <div style={{ fontSize: 11, color: '#94a3ae', marginTop: 4 }}>Raised {timeLabel(loan.disputedAt)}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {loan.status === 'FUNDED' && (
+                      <button style={S.outlineBtn} disabled={busy} onClick={() => handleForceActive(loan.id)}>Force active</button>
+                    )}
+                    {['ACTIVE', 'DEFAULTED'].includes(loan.status) && (
+                      <button style={S.approveBtn} disabled={busy} onClick={() => handleForceRepaid(loan.id)}>Mark repaid</button>
+                    )}
+                    {loan.borrower?.id && (
+                      <button style={S.outlineBtn} onClick={() => setDrawerUser(loan.borrower)}>View borrower</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ===== 7. UNIVERSITIES ===== */}
+        {!loading && activeSection === 'universities' && (
+          <section>
+            <div style={S.card}>
+              <h4 style={{ fontSize: 15, marginBottom: 4 }}>Add a campus</h4>
+              <p style={{ fontSize: 12.2, color: '#94a3ae', marginBottom: 14 }}>
+                The database is the source of truth for allowed signup domains. Adding a university here opens it
+                immediately — no redeploy needed. See <code>docs/MULTI_UNIVERSITY.md</code>.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+                <div>
+                  <label style={S.fieldLabel}>NAME</label>
+                  <input style={S.input} value={uniForm.name} onChange={e => setUniForm(f => ({ ...f, name: e.target.value }))} placeholder="Lovely Professional University" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>SHORT NAME</label>
+                  <input style={S.input} value={uniForm.shortName} onChange={e => setUniForm(f => ({ ...f, shortName: e.target.value }))} placeholder="LPU" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>EMAIL DOMAIN</label>
+                  <input style={S.input} value={uniForm.emailDomain} onChange={e => setUniForm(f => ({ ...f, emailDomain: e.target.value }))} placeholder="lpu.in" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>CITY</label>
+                  <input style={S.input} value={uniForm.city} onChange={e => setUniForm(f => ({ ...f, city: e.target.value }))} placeholder="Phagwara" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>STATE</label>
+                  <input style={S.input} value={uniForm.state} onChange={e => setUniForm(f => ({ ...f, state: e.target.value }))} placeholder="Punjab" />
+                </div>
+              </div>
+              <button style={{ ...S.darkBtn, marginTop: 16 }} disabled={busy} onClick={handleAddUniversity}>Add university</button>
+            </div>
+
+            <div style={S.card}>
+              <h4 style={{ fontSize: 15, marginBottom: 12 }}>Campuses ({universities.length})</h4>
+              {universities.length === 0 && <p style={{ color: '#94a3ae', fontSize: 13 }}>No universities configured.</p>}
+              {universities.map((uni, i) => (
+                <div key={uni.id} style={{ ...S.acctRow, ...(i === universities.length - 1 ? { borderBottom: 'none' } : {}) }}>
+                  <div style={S.acctAvatar}>{(uni.shortName || uni.name || 'U')[0].toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{uni.name}</div>
+                    <div style={{ fontSize: 11.6, color: '#94a3ae', marginTop: 2 }}>
+                      @{uni.emailDomain} · {uni.city}, {uni.state} · {uni._count?.users ?? 0} user(s)
+                    </div>
+                  </div>
+                  <span style={S.pill(uni.isActive ? 'approved' : 'rejected')}>{uni.isActive ? 'Active' : 'Disabled'}</span>
+                  <button style={S.outlineBtn} disabled={busy} onClick={() => handleToggleUniversity(uni)}>
+                    {uni.isActive ? 'Disable signups' : 'Enable signups'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ===== 8. POLICY SETTINGS ===== */}
+        {!loading && activeSection === 'policy' && (
+          <section>
+            {!config && (
+              <div style={{ ...S.card, color: '#94a3ae' }}>No platform configuration found yet. Saving will create the first config record.</div>
+            )}
+            {!canWriteConfig && (
+              <div className="portal-alert" style={{ marginBottom: 16, fontSize: 13 }}>
+                You have read-only access to platform policy. Only Super Admin and Finance Admin can change these values.
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
+              <div style={S.card}>
+                <h4 style={{ fontSize: 15, marginBottom: 4 }}>Economics</h4>
+                <p style={{ fontSize: 12.2, color: '#64748b', marginBottom: 12 }}>Fixed by design.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={S.fieldLabel}>INTEREST</label>
+                    <input style={{ ...S.input, opacity: 0.6 }} value="None (interest-free)" disabled />
+                  </div>
+                  <div>
+                    <label style={S.fieldLabel}>PLATFORM FEE</label>
+                    <input style={{ ...S.input, opacity: 0.6 }} value="None" disabled />
+                  </div>
+                </div>
+                <p style={{ fontSize: 11.4, color: '#94a3ae', marginTop: 10 }}>UniFi is non-custodial and charges no interest or fees; peers settle directly.</p>
+              </div>
+
+              <div style={S.card}>
+                <h4 style={{ fontSize: 15, marginBottom: 4 }}>Loan amount limits</h4>
+                <p style={{ fontSize: 12.2, color: '#64748b', marginBottom: 12 }}>Platform-wide caps on a single request (₹).</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={S.fieldLabel}>MIN LOAN AMOUNT (₹)</label>
+                    <input style={S.input} type="number" disabled={!canWriteConfig} value={policy.minLoanAmount} onChange={e => setPolicy(p => ({ ...p, minLoanAmount: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={S.fieldLabel}>MAX LOAN AMOUNT (₹)</label>
+                    <input style={S.input} type="number" disabled={!canWriteConfig} value={policy.maxLoanAmount} onChange={e => setPolicy(p => ({ ...p, maxLoanAmount: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={S.card}>
+              <h4 style={{ fontSize: 15, marginBottom: 4 }}>Credit-score borrow limits</h4>
+              <p style={{ fontSize: 12.2, color: '#64748b', marginBottom: 12 }}>A borrower's limit is the tier their credit score qualifies for.</p>
+              {[
+                ['scoreTier1MinScore', 'scoreTier1Limit', 'Tier 1'],
+                ['scoreTier2MinScore', 'scoreTier2Limit', 'Tier 2'],
+                ['scoreTier3MinScore', 'scoreTier3Limit', 'Tier 3'],
+              ].map(([scoreKey, limitKey, label]) => (
+                <div key={label} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 16, alignItems: 'end', marginBottom: 12 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>{label}</div>
+                  <div>
+                    <label style={S.fieldLabel}>MIN CREDIT SCORE</label>
+                    <input style={S.input} type="number" disabled={!canWriteConfig} value={policy[scoreKey]} onChange={e => setPolicy(p => ({ ...p, [scoreKey]: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={S.fieldLabel}>BORROW LIMIT (₹)</label>
+                    <input style={S.input} type="number" disabled={!canWriteConfig} value={policy[limitKey]} onChange={e => setPolicy(p => ({ ...p, [limitKey]: e.target.value }))} />
+                  </div>
+                </div>
               ))}
             </div>
 
-            {/* Disputes from loan overdue data + sample from users notifications */}
-            {loans.filter(l => l.hasDispute || l.status === 'OVERDUE').length === 0 && (
-              <div style={{ ...S.card, textAlign: 'center', color: '#94a3ae', padding: 30 }}>
-                No active disputes. ✓
-              </div>
-            )}
-
-            {loans.filter(l => l.hasDispute || l.status === 'OVERDUE').map((loan, i) => {
-              const status = loan.disputeStatus || (loan.status === 'OVERDUE' ? 'open' : 'resolved')
-              const show = disputeTab === 'all' || disputeTab === status
-              if (!show) return null
-              return (
-                <div key={`dis-${loan.id}`} style={{ ...S.card, marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.6 }}>
-                        "{loan.disputeTitle || `Repayment issue — ${loan.purpose}`}"
-                      </div>
-                      <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 4 }}>
-                        {loan.borrower?.firstName || 'Borrower'} {loan.borrower?.lastName || ''} · {dateLabel(loan.dueDate)}
-                      </div>
-                    </div>
-                    <span style={{ ...S.pill(status === 'open' ? 'warn' : status === 'progress' ? 'pending' : 'approved'), margin: '0 10px' }}>
-                      {status === 'progress' ? 'In progress' : cap(status)}
-                    </span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button style={S.outlineBtn} onClick={() => { setDrawerUser(loan.borrower); setLimitInput('') }}>View account</button>
-                      <button style={S.approveBtn} onClick={() => handleRespondDispute(`${loan.borrower?.firstName || 'user'}`)}>Respond</button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Always show a sample if no overdue loans */}
-            {loans.filter(l => l.hasDispute || l.status === 'OVERDUE').length === 0 && (
-              <div style={{ ...S.card, color: '#94a3ae', textAlign: 'center', padding: 30 }}>No disputes to show.</div>
-            )}
-          </section>
-        )}
-
-        {/* ===== 7. POLICY SETTINGS ===== */}
-        {!loading && activeSection === 'policy' && (
-          <section>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
-              {/* Interest Rate Policy */}
-              <div style={S.card}>
-                <h4 style={{ fontSize: 15, marginBottom: 4 }}>Interest rate policy</h4>
-                <p style={{ fontSize: 12.2, color: '#64748b', marginBottom: 12 }}>The range providers can choose from when setting their lending terms.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <label style={S.fieldLabel}>MINIMUM RATE (%)</label>
-                    <input style={S.input} type="number" value={policy.minRate} step="0.5" onChange={e => setPolicy(p => ({ ...p, minRate: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={S.fieldLabel}>MAXIMUM RATE (%)</label>
-                    <input style={S.input} type="number" value={policy.maxRate} step="0.5" onChange={e => setPolicy(p => ({ ...p, maxRate: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Loan & Request Limits */}
-              <div style={S.card}>
-                <h4 style={{ fontSize: 15, marginBottom: 4 }}>Loan & request limits</h4>
-                <p style={{ fontSize: 12.2, color: '#64748b', marginBottom: 12 }}>Platform-wide caps applied to every borrower.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <label style={S.fieldLabel}>MAX SINGLE LOAN AMOUNT (₹)</label>
-                    <input style={S.input} type="number" value={policy.maxLoanAmount} onChange={e => setPolicy(p => ({ ...p, maxLoanAmount: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={S.fieldLabel}>MAX ACTIVE REQUESTS / BORROWER</label>
-                    <input style={S.input} type="number" value={policy.maxActiveRequests} onChange={e => setPolicy(p => ({ ...p, maxActiveRequests: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
-              {/* Credit Limit Tiers — Borrowers */}
-              <div style={S.card}>
-                <h4 style={{ fontSize: 15, marginBottom: 12 }}>Credit limit tiers — Borrowers</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <label style={S.fieldLabel}>NEW, KYC-APPROVED (₹)</label>
-                    <input style={S.input} type="number" value={policy.newBorrowerLimit} onChange={e => setPolicy(p => ({ ...p, newBorrowerLimit: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={S.fieldLabel}>AFTER 1ST REPAYMENT (₹)</label>
-                    <input style={S.input} type="number" value={policy.after1stRepayLimit} onChange={e => setPolicy(p => ({ ...p, after1stRepayLimit: e.target.value }))} />
-                  </div>
-                  <div style={{ gridColumn: '1/-1' }}>
-                    <label style={S.fieldLabel}>AFTER 3+ ON-TIME REPAYMENTS (₹)</label>
-                    <input style={S.input} type="number" value={policy.after3RepayLimit} onChange={e => setPolicy(p => ({ ...p, after3RepayLimit: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Lending Limit Tiers — Providers */}
-              <div style={S.card}>
-                <h4 style={{ fontSize: 15, marginBottom: 12 }}>Lending limit tiers — Providers</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <label style={S.fieldLabel}>BASE, KYC-APPROVED (₹)</label>
-                    <input style={S.input} type="number" value={policy.baseProviderLimit} onChange={e => setPolicy(p => ({ ...p, baseProviderLimit: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label style={S.fieldLabel}>TRUSTED (6+ MONTHS, NO DEFAULTS) (₹)</label>
-                    <input style={S.input} type="number" value={policy.trustedProviderLimit} onChange={e => setPolicy(p => ({ ...p, trustedProviderLimit: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Required KYC Steps */}
             <div style={S.card}>
-              <h4 style={{ fontSize: 15, marginBottom: 10 }}>Required KYC steps</h4>
-              <div>
-                <div style={S.toggleRow}>
-                  <span style={{ fontSize: 13, color: '#64748b' }}>University email verification</span>
-                  <b style={{ fontSize: 11.5, color: '#94a3ae' }}>Always required</b>
+              <h4 style={{ fontSize: 15, marginBottom: 4 }}>Provider timing windows</h4>
+              <p style={{ fontSize: 12.2, color: '#64748b', marginBottom: 12 }}>How long providers have to act before a request is released or cancelled.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={S.fieldLabel}>ACCEPT WINDOW (HOURS)</label>
+                  <input style={S.input} type="number" disabled={!canWriteConfig} value={policy.providerAcceptWindowHours} onChange={e => setPolicy(p => ({ ...p, providerAcceptWindowHours: e.target.value }))} />
                 </div>
-                {[
-                  { key: 'requireIdCard', label: 'ID card upload' },
-                  { key: 'requireCamera', label: 'Camera liveness check' },
-                  { key: 'requireOtp', label: 'Phone OTP verification' },
-                  { key: 'requireUpi', label: 'UPI ID linking' },
-                  { key: 'requireGuarantor', label: 'Guarantor required above ₹20,000 (borrowers)' },
-                  { key: 'requirePan', label: 'PAN required above ₹40,000 interest/year (providers)' },
-                ].map(item => (
-                  <div key={item.key} style={S.toggleRow}>
-                    <span style={{ fontSize: 13, color: '#64748b' }}>{item.label}</span>
-                    <div
-                      onClick={() => setPolicy(p => ({ ...p, [item.key]: !p[item.key] }))}
-                      style={{ width: 42, height: 24, borderRadius: 100, background: policy[item.key] ? '#8fbfa3' : 'rgba(31,41,55,.15)', position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background .2s' }}
-                    >
-                      <div style={{ position: 'absolute', top: 3, left: policy[item.key] ? 21 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 2px 6px rgba(0,0,0,.2)' }} />
-                    </div>
-                  </div>
-                ))}
+                <div>
+                  <label style={S.fieldLabel}>FUND WINDOW (HOURS)</label>
+                  <input style={S.input} type="number" disabled={!canWriteConfig} value={policy.providerFundWindowHours} onChange={e => setPolicy(p => ({ ...p, providerFundWindowHours: e.target.value }))} />
+                </div>
               </div>
-              <button style={{ ...S.darkBtn, marginTop: 18 }} onClick={handleSavePolicy}>Save policy changes</button>
+              {canWriteConfig && (
+                <button style={{ ...S.darkBtn, marginTop: 18 }} disabled={busy} onClick={handleSaveConfig}>Save policy changes</button>
+              )}
             </div>
           </section>
         )}
 
-        {/* ===== 8. AUDIT LOG ===== */}
+        {/* ===== 7. AUDIT LOG ===== */}
         {!loading && activeSection === 'audit' && (
           <section>
             <div style={S.card}>
               <h4 style={{ fontSize: 15, marginBottom: 6 }}>Audit log</h4>
               {auditLogs.length === 0 && <p style={{ color: '#94a3ae', fontSize: 13 }}>No audit entries yet.</p>}
               {auditLogs.map((log, i) => (
-                <div key={i} style={{ ...S.actRow, ...(i === auditLogs.length - 1 ? { borderBottom: 'none' } : {}) }}>
-                  <div style={S.actIc(i < 2)}>✓</div>
+                <div key={log.id || i} style={{ ...S.actRow, ...(i === auditLogs.length - 1 ? { borderBottom: 'none' } : {}) }}>
+                  <div style={S.actIc(true)}>✓</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13.3, fontWeight: 500 }}>{log.a}</div>
-                    <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 2 }}>{log.t}</div>
+                    <div style={{ fontSize: 13.3, fontWeight: 500 }}>{log.description || log.action}</div>
+                    <div style={{ fontSize: 11.3, color: '#94a3ae', marginTop: 2 }}>
+                      {log.action}{log.targetType ? ` · ${log.targetType}` : ''} · {log.admin?.firstName || log.admin?.email || 'Admin'} · {timeLabel(log.createdAt)}
+                    </div>
                   </div>
                 </div>
               ))}

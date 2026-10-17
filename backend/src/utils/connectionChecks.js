@@ -2,7 +2,6 @@ const prisma = require('../config/db')
 const redis = require('../config/redis')
 const nodemailer = require('nodemailer')
 const logger = require('../config/logger')
-const { paymentProvider } = require('../config/env')
 
 const tryWithRetries = async (fn, { retries = 3, delay = 1000, factor = 2, name = 'task' } = {}) => {
   let attempt = 0
@@ -140,24 +139,10 @@ const checkSmtp = async () => {
   }
 }
 
-const checkPaymentProvider = async () => {
-  const provider = paymentProvider()
-  if (provider === 'RAZORPAY') {
-    // env.validateEnv already checks credentials; here we only log presence
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      throw new Error('Razorpay credentials missing')
-    }
-    logger.info('✅ Razorpay configured')
-  } else {
-    logger.info(`Payment provider: ${provider}`)
-  }
-}
-
 const checkAndConnectAll = async () => {
-  // Prisma and Redis are critical for the app; SMTP/payment are best-effort
+  // Prisma and Redis are critical for the app; SMTP is best-effort
   await checkPrisma()
   await checkRedis()
-  await checkPaymentProvider()
   await checkSmtp()
 }
 

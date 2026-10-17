@@ -28,6 +28,11 @@ export const AuthProvider = ({ children }) => {
   const [refreshToken, setRefreshToken] = useState(initial?.refreshToken || '')
   const [user, setUser] = useState(initial?.user || null)
   const [loading, setLoading] = useState(false)
+  // True while we resolve a persisted session on first load, so guards can show
+  // a spinner instead of prematurely redirecting or hanging forever.
+  const [bootstrapping, setBootstrapping] = useState(
+    Boolean(initial?.accessToken || initial?.refreshToken)
+  )
 
   const setSession = (session) => {
     if (!session) {
@@ -89,22 +94,46 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  // On initial load, attempt token refresh if refreshToken exists to ensure fresh session
+  // On initial load, resolve the persisted session: refresh the access token if
+  // needed, then hydrate the user object via /auth/me so a stored token with a
+  // missing/partial user never leaves protected routes stuck on a spinner.
   useEffect(() => {
+    let cancelled = false
+
     const hydrateSession = async () => {
       const stored = readStored()
-      if (stored?.refreshToken && !stored?.accessToken) {
-        try {
+      if (!stored?.accessToken && !stored?.refreshToken) {
+        setBootstrapping(false)
+        return
+      }
+
+      try {
+        let activeAccess = stored.accessToken
+
+        if (!activeAccess && stored.refreshToken) {
           const res = await api.post('/auth/refresh', { refreshToken: stored.refreshToken })
-          if (res?.data) {
-            setSession(res.data)
+          if (res?.data?.accessToken) {
+            if (!cancelled) setSession(res.data)
+            activeAccess = res.data.accessToken
           }
-        } catch {
-          clearSession()
         }
+
+        // Ensure we have a fresh, authoritative user object.
+        if (activeAccess && !stored.user) {
+          const meRes = await api.get('/auth/me', activeAccess)
+          if (meRes?.data && !cancelled) setUser(meRes.data)
+        }
+      } catch {
+        if (!cancelled) clearSession()
+      } finally {
+        if (!cancelled) setBootstrapping(false)
       }
     }
+
     hydrateSession()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const register = async (payload) => {
@@ -206,6 +235,7 @@ export const AuthProvider = ({ children }) => {
       accessToken,
       refreshToken,
       loading,
+      bootstrapping,
       register,
       verifyOtp,
       resendOtp,
@@ -217,7 +247,7 @@ export const AuthProvider = ({ children }) => {
       forgotPassword,
       resetPassword,
     }),
-    [user, accessToken, refreshToken, loading]
+    [user, accessToken, refreshToken, loading, bootstrapping]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

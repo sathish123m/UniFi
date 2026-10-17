@@ -1,16 +1,17 @@
-# UniFi Deployment (Render + Vercel, SMTP OTP + Razorpay Test)
+# UniFi Deployment (Render + Vercel, SMTP OTP, record-only)
 
 This runbook deploys your current project with:
 - Real email OTP (Gmail SMTP)
-- Razorpay in **Test Mode**
+- Cloud object storage (Cloudflare R2) for KYC documents
 - PostgreSQL + Redis
+- **No payment gateway** — UniFi is non-custodial and record-only
 
 ## 1. Deploy Backend on Render
 
 1. Open [Render Dashboard](https://dashboard.render.com/).
 2. Click **New +** -> **Blueprint**.
 3. Select your GitHub repo: `sathish123m/UniFi`.
-4. Render will detect `/Users/msk/Desktop/Uni-Fi/render.yaml`.
+4. Render will detect `render.yaml` at the repository root.
 5. Create the backend service `unifi-backend`.
 
 After service creation, open backend service -> **Environment** and fill all `sync: false` variables.
@@ -22,15 +23,18 @@ Minimum required values:
 - `DATABASE_URL=<your-neon-or-render-postgres-url>`
 - `REDIS_URL=<your-upstash-or-render-redis-url>`
 - `ENCRYPTION_KEY=<64-char-hex>`
-- `RAZORPAY_KEY_ID=rzp_test_...`
-- `RAZORPAY_KEY_SECRET=...`
-- `RAZORPAY_WEBHOOK_SECRET=...`
+- `R2_ACCOUNT_ID=<cloudflare-account-id>`
+- `R2_ACCESS_KEY_ID=<r2-access-key>`
+- `R2_SECRET_ACCESS_KEY=<r2-secret>`
+- `R2_BUCKET_NAME=<bucket>`
+- `R2_PUBLIC_URL=<https://...r2.dev or custom domain>`
 - `SMTP_USER=<your-gmail-address>`
 - `SMTP_PASS=<gmail-16-char-app-password>`
 - `SMTP_FROM=<same-gmail-address>`
 
 Notes:
-- `NODE_ENV=production`, `PAYMENT_PROVIDER=RAZORPAY`, and rate-limit defaults are already in `render.yaml`.
+- `NODE_ENV=production` and rate-limit defaults are already in `render.yaml`.
+- **No payment keys are needed** and none are declared in `render.yaml`.
 - Startup command already runs `prisma migrate deploy`.
 
 ## 2. Deploy Frontend on Vercel
@@ -56,15 +60,15 @@ After Vercel gives a production URL:
    - `CORS_ORIGINS=https://<vercel-domain>`
 2. Redeploy backend.
 
-## 4. Configure Razorpay Test Webhook
+## 4. Configure KYC Object Storage (Cloudflare R2)
 
-In [Razorpay Dashboard (Test)](https://dashboard.razorpay.com/):
-1. Go to **Webhooks** -> **Add New Webhook**.
-2. URL: `https://<your-render-service>.onrender.com/api/payments/webhook`
-3. Events:
-   - `payment.captured`
-   - `payment.failed`
-4. Secret: exactly same value as `RAZORPAY_WEBHOOK_SECRET`.
+UniFi refuses local-disk storage in production, so KYC uploads fail until R2 is set:
+
+1. In [Cloudflare Dashboard](https://dash.cloudflare.com/), open **R2** -> create a bucket.
+2. Create an R2 API token (Object Read & Write) -> note the **Access Key ID** and **Secret**.
+3. Fill `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
+4. Expose the bucket via an r2.dev URL or custom domain -> set `R2_PUBLIC_URL`.
+5. Redeploy and upload a test KYC document as a borrower.
 
 ## 5. Verify SMTP OTP
 
@@ -82,14 +86,13 @@ Functional test:
 - `GET /health` returns `status: ok`.
 - Borrower and provider login works.
 - Role guard works (cross-role route access blocked).
-- Create funding and repayment orders (Razorpay test).
+- Create a loan, fund it as a provider, then confirm handover from both sides (loan goes `ACTIVE`).
 - OTP resend and verify flows are stable.
 
 ## 7. Production Notes
 
 - Keep `.env` secrets only in provider dashboards; never in GitHub.
-- Rotate SMTP app password and Razorpay secrets periodically.
+- Rotate the SMTP app password, `ENCRYPTION_KEY`, `JWT_*` secrets and R2 keys periodically.
 - For custom domain, update:
   - Vercel project domain
   - Render env (`APP_URL`, `FRONTEND_URL`, `CORS_ORIGINS`)
-  - Razorpay webhook URL

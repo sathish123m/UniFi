@@ -1,7 +1,6 @@
 const { z } = require("zod");
 const {
   allowedEmailDomains,
-  allowedEmailSuffixes,
   isAllowedUniversityEmail,
 } = require("../config/university");
 
@@ -103,8 +102,6 @@ const upiSchema = z.object({
 
 const platformConfigSchema = z.object({
   body: z.object({
-    interestRatePercent: z.number().positive().max(100).optional(),
-    platformFeePercent: z.number().min(0).max(100).optional(),
     minLoanAmount: z.number().int().positive().optional(),
     maxLoanAmount: z.number().int().positive().optional(),
     scoreTier1MinScore: z.number().int().min(300).max(900).optional(),
@@ -141,6 +138,49 @@ const resetPasswordSchema = z.object({
   }),
 });
 
+const strongPassword = z
+  .string()
+  .min(8)
+  .max(72)
+  .regex(/[A-Z]/, "Must include uppercase")
+  .regex(/[a-z]/, "Must include lowercase")
+  .regex(/[0-9]/, "Must include number")
+  .regex(/[^A-Za-z0-9]/, "Must include special character");
+
+const updateProfileSchema = z.object({
+  body: z
+    .object({
+      firstName: z.string().trim().min(1).max(50).optional(),
+      lastName: z.string().trim().min(1).max(50).optional(),
+      phone: z
+        .string()
+        .trim()
+        .refine(
+          (v) => !v || /^\+[1-9]\d{9,14}$/.test(v),
+          "Phone must be in international format, e.g. +919876543210",
+        )
+        .optional(),
+    })
+    .refine((b) => Object.keys(b).length > 0, "No fields to update"),
+});
+
+const changePasswordSchema = z.object({
+  body: z.object({
+    currentPassword: z.string().min(1),
+    newPassword: strongPassword,
+  }),
+});
+
+const adminCreateSchema = z.object({
+  body: z.object({
+    email: z.string().trim().email(),
+    password: strongPassword,
+    firstName: z.string().trim().min(1).max(50),
+    lastName: z.string().trim().min(1).max(50),
+    role: z.enum(["MOD_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]),
+  }),
+});
+
 module.exports = {
   validate,
   registerSchema,
@@ -151,4 +191,7 @@ module.exports = {
   platformConfigSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  updateProfileSchema,
+  changePasswordSchema,
+  adminCreateSchema,
 };

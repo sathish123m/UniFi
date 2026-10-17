@@ -365,7 +365,7 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
     <div class="login-brand"><span class="dot"></span>UniFi</div>
     <span class="role-tag">Provider</span>
     <h1>Welcome back</h1>
-    <p class="sub">Log in with your verified university email to review requests and track your earnings.</p>
+    <p class="sub">Log in with your verified university email to review requests and track the loans you fund.</p>
     <div class="field">
       <label>UNIVERSITY EMAIL</label>
       <input type="email" id="loginEmail" placeholder="rahul.verma@nituni.edu.in" value="rahul.verma@nituni.edu.in">
@@ -392,7 +392,7 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
       <a class="nav-item" data-sec="account" onclick="switchSection('account')"><svg class="icon"><use href="#ic-user"/></svg>Account</a>
       <a class="nav-item" data-sec="kyc" onclick="switchSection('kyc')"><svg class="icon"><use href="#ic-shield"/></svg>KYC &amp; Verification</a>
       <a class="nav-item" data-sec="provide" onclick="switchSection('provide')"><svg class="icon"><use href="#ic-trend"/></svg>Provide</a>
-      <a class="nav-item" data-sec="balance" onclick="switchSection('balance')"><svg class="icon"><use href="#ic-bank"/></svg>Balance &amp; Earnings</a>
+      <a class="nav-item" data-sec="balance" onclick="switchSection('balance')"><svg class="icon"><use href="#ic-bank"/></svg>Lending Record</a>
       <a class="nav-item" data-sec="notifications" onclick="switchSection('notifications')"><svg class="icon"><use href="#ic-bell"/></svg>Notifications</a>
       <a class="nav-item" data-sec="help" onclick="switchSection('help')"><svg class="icon"><use href="#ic-help"/></svg>Help / Support</a>
     </nav>
@@ -439,8 +439,8 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
           </div>
         </div>
         <div class="card stat-card">
-          <h4>Interest earned (lifetime)</h4>
-          <div class="stat-value" style="color:var(--sage-dim);">₹3,312</div>
+          <h4>Principal returned (lifetime)</h4>
+          <div class="stat-value" style="color:var(--sage-dim);">₹8,450</div>
           <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Across 4 funded requests</div>
         </div>
       </section>
@@ -454,24 +454,24 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
           <div class="progress-track"><div class="progress-fill" id="loanProgress" style="width:0%"></div></div>
           <div class="progress-labels"><span>Repaid: <span class="mono">₹4,800</span></span><span>Remaining: <span class="mono">₹4,800</span></span></div>
           <div class="loan-meta">
-            <div><span>Interest rate</span><b>5%</b></div>
-            <div><span>Expected interest</span><b>₹480</b></div>
+            <div><span>Interest</span><b>0%</b></div>
+            <div><span>Repayable</span><b>₹9,600</b></div>
             <div><span>Next due</span><b>12 Aug</b></div>
           </div>
         </div>
 
         <div class="card repay-card tilt">
-          <div class="re-label">Withdrawable balance</div>
-          <div class="re-amount">₹8,450</div>
-          <div class="re-due">Ready to withdraw anytime</div>
-          <button class="repay-btn" onclick="switchSection('balance')">View balance <svg class="icon"><use href="#ic-arrow"/></svg></button>
+          <div class="re-label">Principal out right now</div>
+          <div class="re-amount">₹4,800</div>
+          <div class="re-due">Awaiting confirmed repayment</div>
+          <button class="repay-btn" onclick="switchSection('balance')">View lending record <svg class="icon"><use href="#ic-arrow"/></svg></button>
         </div>
       </section>
 
       <section class="quick-actions">
         <button class="qa-btn" onclick="switchSection('provide')"><div class="qa-icon"><svg class="icon"><use href="#ic-wallet"/></svg></div><span>Review requests</span></button>
         <button class="qa-btn" onclick="switchSection('provide')"><div class="qa-icon"><svg class="icon"><use href="#ic-sliders"/></svg></div><span>Set lending terms</span></button>
-        <button class="qa-btn" onclick="switchSection('balance')"><div class="qa-icon"><svg class="icon"><use href="#ic-trend"/></svg></div><span>View balance</span></button>
+        <button class="qa-btn" onclick="switchSection('balance')"><div class="qa-icon"><svg class="icon"><use href="#ic-trend"/></svg></div><span>View lending record</span></button>
         <button class="qa-btn" onclick="switchSection('help')"><div class="qa-icon"><svg class="icon"><use href="#ic-help"/></svg></div><span>Contact support</span></button>
       </section>
 
@@ -633,7 +633,7 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
           </div>
           <div class="kyc-item" style="padding-left:0;padding-right:0;border-bottom:none;">
             <div class="kii"><svg class="icon"><use href="#ic-doc"/></svg></div>
-            <div class="kit"><h5>PAN details <span style="font-weight:400;color:var(--ink-faint);">(optional)</span></h5><p>Needed only if annual interest crosses the TDS threshold</p></div>
+            <div class="kit"><h5>PAN details <span style="font-weight:400;color:var(--ink-faint);">(optional)</span></h5><p>Collected for provider KYC compliance</p></div>
             <div class="kis"><button class="btn-outline" style="padding:8px 14px;font-size:12px;">Add</button></div>
           </div>
         </div>
@@ -644,14 +644,14 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
     <section class="dash-section" id="sec-provide">
       <div class="card" style="margin-bottom:20px;">
         <h4 style="font-size:15px;">Your lending terms</h4>
-        <p style="font-size:12.3px;color:var(--ink-dim);margin-top:4px;">Set how much you want to keep available, and the interest you'd like to earn.</p>
+        <p style="font-size:12.3px;color:var(--ink-dim);margin-top:4px;">Set how much you want to keep available to lend to campusmates — interest-free.</p>
         <div class="form-grid" style="margin-top:6px;">
           <div class="field"><label>AMOUNT YOU WANT TO LEND</label><input type="number" value="50000"></div>
           <div class="field">
-            <label>PREFERRED INTEREST RATE</label>
+            <label>PREFERRED TENURE</label>
             <div class="range-wrap">
-              <input type="range" min="3" max="6" step="0.5" value="4.5" oninput="document.getElementById('rateVal').textContent=this.value+'%'">
-              <div class="range-val"><span>3% min</span><b id="rateVal">4.5%</b><span>6% campus cap</span></div>
+              <input type="range" min="7" max="30" step="7" value="14" oninput="document.getElementById('rateVal').textContent=this.value+' days'">
+              <div class="range-val"><span>7 days</span><b id="rateVal">14 days</b><span>30 days</span></div>
             </div>
           </div>
           <div class="field" style="grid-column:1/-1;">
@@ -713,8 +713,8 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
             <div class="progress-track"><div class="progress-fill" style="width:50%;"></div></div>
             <div class="progress-labels"><span>Repaid: <span class="mono">₹4,800</span></span><span>Remaining: <span class="mono">₹4,800</span></span></div>
             <div class="loan-meta">
-              <div><span>Interest rate</span><b>5%</b></div>
-              <div><span>Expected interest</span><b>₹480</b></div>
+              <div><span>Interest</span><b>0%</b></div>
+              <div><span>Repayable</span><b>₹9,600</b></div>
               <div><span>Next due</span><b>12 Aug</b></div>
             </div>
           </div>
@@ -725,8 +725,8 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
             <div class="progress-track"><div class="progress-fill" style="width:100%;"></div></div>
             <div class="progress-labels"><span>Repaid: <span class="mono">₹1,800</span></span><span>Remaining: <span class="mono">₹0</span></span></div>
             <div class="loan-meta">
-              <div><span>Interest rate</span><b>4%</b></div>
-              <div><span>Interest earned</span><b>₹72</b></div>
+              <div><span>Interest</span><b>0%</b></div>
+              <div><span>Repaid</span><b>₹1,800</b></div>
               <div><span>Closed on</span><b>15 May</b></div>
             </div>
           </div>
@@ -734,30 +734,30 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
       </div>
     </section>
 
-    <!-- ===== BALANCE & EARNINGS ===== -->
+    <!-- ===== LENDING RECORD ===== -->
     <section class="dash-section" id="sec-balance">
       <section class="stat-row">
-        <div class="card stat-card"><h4>Total balance</h4><div class="stat-value">₹40,450</div></div>
+        <div class="card stat-card"><h4>Principal returned</h4><div class="stat-value">₹8,450</div></div>
         <div class="card stat-card"><h4>Principal currently lent</h4><div class="stat-value">₹9,600</div></div>
-        <div class="card stat-card"><h4>Interest earned (lifetime)</h4><div class="stat-value" style="color:var(--sage-dim);">₹3,312</div></div>
+        <div class="card stat-card"><h4>Trust score</h4><div class="stat-value" style="color:var(--sage-dim);">742</div></div>
       </section>
 
       <div class="content-grid" style="grid-template-columns:1.3fr 1fr;">
         <div class="card">
-          <h4 style="font-size:15px;">Balance breakdown</h4>
+          <h4 style="font-size:15px;">Lending record</h4>
           <div style="margin-top:10px;">
-            <div class="bal-row"><span>Available to withdraw</span><b>₹8,450</b></div>
-            <div class="bal-row"><span>Available to lend (unallocated)</span><b>₹32,000</b></div>
-            <div class="bal-row"><span>Locked in active loans (principal)</span><b>₹9,600</b></div>
-            <div class="bal-row"><span>Expected interest on active loans</span><b>₹480</b></div>
+            <div class="bal-row"><span>Principal returned to you</span><b>₹8,450</b></div>
+            <div class="bal-row"><span>Out with borrowers (unconfirmed)</span><b>₹4,800</b></div>
+            <div class="bal-row"><span>Principal in active loans</span><b>₹9,600</b></div>
+            <div class="bal-row"><span>Interest on active loans</span><b>₹0</b></div>
           </div>
         </div>
         <div class="card repay-card tilt">
-          <div class="re-label">Withdrawable balance</div>
-          <div class="re-amount">₹8,450</div>
+          <div class="re-label">Peers repay you directly</div>
+          <div class="re-amount">₹0 fee</div>
           <div class="re-due">Linked UPI: rahul.verma@okicici</div>
-          <div class="field" style="margin-top:16px;"><label>WITHDRAW AMOUNT</label><input type="number" placeholder="₹ 8,450"></div>
-          <button class="repay-btn" onclick="showToast('Withdrawal initiated to your UPI.')">Withdraw to UPI <svg class="icon"><use href="#ic-bank"/></svg></button>
+          <div class="field" style="margin-top:16px;"><label>LEND MORE</label><input type="number" placeholder="₹ 10,000"></div>
+          <button class="repay-btn" onclick="switchSection('provide')">Browse marketplace <svg class="icon"><use href="#ic-arrow"/></svg></button>
         </div>
       </div>
 
@@ -765,8 +765,8 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
         <h4>Transaction history</h4>
         <div class="activity-row good">
           <div class="activity-ic"><svg><use href="#ic-trend"/></svg></div>
-          <div class="activity-text"><div class="t1">Interest credited — Textbook loan</div><div class="t2">15 May · Ref #INT1105092</div></div>
-          <div class="activity-amt">+₹72</div>
+          <div class="activity-text"><div class="t1">Repayment confirmed — Textbook loan</div><div class="t2">15 May · Ref #RPY1505093</div></div>
+          <div class="activity-amt">+₹1,800</div>
         </div>
         <div class="activity-row">
           <div class="activity-ic"><svg><use href="#ic-wallet"/></svg></div>
@@ -781,7 +781,7 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
         </div>
         <div class="activity-row">
           <div class="activity-ic"><svg><use href="#ic-download"/></svg></div>
-          <div class="activity-text"><div class="t1">Withdrawal to UPI</div><div class="t2">1 Jun · Ref #WD0106044</div></div>
+          <div class="activity-text"><div class="t1">Lent directly to a peer</div><div class="t2">1 Jun · Ref #FND0106004</div></div>
           <div class="activity-amt">-₹5,000</div>
         </div>
       </div>
@@ -794,9 +794,9 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
           <button class="seg-tab active">All</button>
           <button class="seg-tab">Unread</button>
         </div>
-        <div class="notif-row unread"><div class="notif-ic warn"><svg><use href="#ic-wallet"/></svg></div><div class="notif-text"><div class="n1">New request matches your lending terms — ₹4,000, 60-day plan</div><div class="n2">Today · 7:40 AM</div></div></div>
+        <div class="notif-row unread"><div class="notif-ic warn"><svg><use href="#ic-wallet"/></svg></div><div class="notif-text"><div class="n1">New request matches your lending terms — ₹4,000, 30-day plan</div><div class="n2">Today · 7:40 AM</div></div></div>
         <div class="notif-row unread"><div class="notif-ic good"><svg><use href="#ic-check"/></svg></div><div class="notif-text"><div class="n1">Repayment of ₹4,800 received from Priya S.</div><div class="n2">12 Jul · 11:02 AM</div></div></div>
-        <div class="notif-row"><div class="notif-ic good"><svg><use href="#ic-trend"/></svg></div><div class="notif-text"><div class="n1">Interest of ₹72 credited to your balance</div><div class="n2">15 May · 9:00 AM</div></div></div>
+        <div class="notif-row"><div class="notif-ic good"><svg><use href="#ic-trend"/></svg></div><div class="notif-text"><div class="n1">Repayment of ₹1,800 confirmed for Textbook loan</div><div class="n2">15 May · 9:00 AM</div></div></div>
         <div class="notif-row"><div class="notif-ic good"><svg><use href="#ic-check"/></svg></div><div class="notif-text"><div class="n1">KYC approved — you're fully verified</div><div class="n2">26 Jun · 9:14 AM</div></div></div>
         <div class="notif-row"><div class="notif-ic"><svg><use href="#ic-user"/></svg></div><div class="notif-text"><div class="n1">Profile photo updated</div><div class="n2">6 Jul · 4:20 PM</div></div></div>
       </div>
@@ -805,7 +805,7 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
     <!-- ===== HELP & SUPPORT ===== -->
     <section class="dash-section" id="sec-help">
       <div class="support-grid" style="margin-bottom:20px;">
-        <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-help"/></svg></div><h5>Browse FAQs</h5><p>Answers to common questions about lending &amp; earnings.</p></div>
+        <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-help"/></svg></div><h5>Browse FAQs</h5><p>Answers to common questions about lending &amp; confirmation.</p></div>
         <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-mail"/></svg></div><h5>Email support</h5><p>support@unifi.campus · replies within a day</p><button class="btn-outline">Email us</button></div>
         <div class="card support-card"><div class="spic"><svg class="icon"><use href="#ic-alert"/></svg></div><h5>Report a default</h5><p>Repayment overdue? Flag it so admin can step in.</p></div>
       </div>
@@ -813,23 +813,23 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
       <div class="card" style="margin-bottom:20px;">
         <h4 style="font-size:15px;">Frequently asked</h4>
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">How is interest calculated?<svg class="icon"><use href="#ic-chevron"/></svg></div>
-          <div class="faq-a">Interest is calculated on the principal you fund, at the rate shown when you approve a request, and credited to your balance as the borrower repays each instalment.</div>
+          <div class="faq-q">Do I earn interest?<svg class="icon"><use href="#ic-chevron"/></svg></div>
+          <div class="faq-a">No. UniFi is interest-free by design — you lend the principal to a peer and are repaid exactly that. Your reward is the campus trust score and standing you build, not a return.</div>
         </div>
         <div class="faq-item" onclick="this.classList.toggle('open')">
           <div class="faq-q">What happens if a borrower defaults?<svg class="icon"><use href="#ic-chevron"/></svg></div>
           <div class="faq-a">Overdue repayments are escalated to the admin team, and repeated defaulters are flagged campus-wide. You can also raise it directly from here.</div>
         </div>
         <div class="faq-item" onclick="this.classList.toggle('open')">
-          <div class="faq-q">How long do withdrawals take?<svg class="icon"><use href="#ic-chevron"/></svg></div>
-          <div class="faq-a">Withdrawals to your linked UPI ID are typically processed within a few hours, and always within one business day.</div>
+          <div class="faq-q">How do repayments work?<svg class="icon"><use href="#ic-chevron"/></svg></div>
+          <div class="faq-a">The borrower repays you directly by UPI or cash, then confirms it in-app. You confirm receipt and the loan is marked repaid. You don't need to withdraw anything — UniFi never holds your money.</div>
         </div>
       </div>
 
       <div class="card">
         <h4 style="font-size:15px;">Raise a support ticket</h4>
         <div class="form-grid" style="margin-top:6px;">
-          <div class="field"><label>CATEGORY</label><select><option>Repayment / default issue</option><option>KYC issue</option><option>Withdrawal issue</option><option>Other</option></select></div>
+          <div class="field"><label>CATEGORY</label><select><option>Repayment / default issue</option><option>KYC issue</option><option>Confirmation issue</option><option>Other</option></select></div>
           <div class="field"><label>SUBJECT</label><input type="text" placeholder="Short summary"></div>
           <div class="field" style="grid-column:1/-1;"><label>DESCRIBE THE ISSUE</label><textarea placeholder="Add as much detail as you can…"></textarea></div>
         </div>
@@ -841,7 +841,7 @@ input[type=range]{width:100%;accent-color:var(--sage);height:6px;}
   <nav class="bottom-nav">
     <a class="bn-item active" data-sec="overview" onclick="switchSection('overview')"><svg><use href="#ic-home"/></svg>Home</a>
     <a class="bn-item" data-sec="provide" onclick="switchSection('provide')"><svg><use href="#ic-trend"/></svg>Provide</a>
-    <a class="bn-item" data-sec="balance" onclick="switchSection('balance')"><svg><use href="#ic-bank"/></svg>Balance</a>
+    <a class="bn-item" data-sec="balance" onclick="switchSection('balance')"><svg><use href="#ic-bank"/></svg>Record</a>
     <a class="bn-item" data-sec="notifications" onclick="switchSection('notifications')"><svg><use href="#ic-bell"/></svg>Alerts</a>
     <a class="bn-item" onclick="toggleSidebar()"><svg><use href="#ic-user"/></svg>More</a>
   </nav>
@@ -857,7 +857,7 @@ const topbarMap = {
   account: ['Account Management', 'Manage your profile, contact details & security'],
   kyc: ['KYC & Verification', 'Camera verification, ID card, UPI & tax details'],
   provide: ['Provide', 'Set your lending terms, review requests & track loans'],
-  balance: ['Balance & Earnings', 'Your balance breakdown, withdrawals & transaction history'],
+  balance: ['Lending Record', 'Principal out, returned, and your confirmation history'],
   notifications: ['Notifications', 'Recent updates on your account'],
   help: ['Help & Support', 'FAQs, contact & raise a ticket']
 };

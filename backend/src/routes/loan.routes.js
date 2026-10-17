@@ -21,8 +21,19 @@ router.get('/my', async (req,res) => ok(res, await loanSvc.myLoans(req.user.id, 
 // Single loan detail
 router.get('/:id', async (req,res) => ok(res, await loanSvc.getLoan(req.params.id, req.user.id)))
 
-// Fund a loan (providers only)
+// Fund a loan (providers only) — a commitment to lend peer-to-peer
 router.post('/:id/fund', restrictTo('PROVIDER'), requireKyc, requireUpi, async (req,res) => ok(res, await loanSvc.fundLoan(req.user.id, req.params.id)))
+
+// Dual confirmation of the handover (record-only, no money moves through UniFi)
+router.post('/:id/handover', restrictTo('PROVIDER'), async (req,res) => ok(res, await loanSvc.markFundingSent(req.params.id, req.user.id), 'Handover recorded'))
+router.post('/:id/received', restrictTo('BORROWER'), async (req,res) => ok(res, await loanSvc.confirmFundingReceived(req.params.id, req.user.id), 'Receipt confirmed'))
+
+// Dual confirmation of the repayment
+router.post('/:id/repay-claimed', restrictTo('BORROWER'), async (req,res) => ok(res, await loanSvc.claimRepayment(req.params.id, req.user.id), 'Repayment marked'))
+router.post('/:id/confirm-repayment', restrictTo('PROVIDER'), async (req,res) => ok(res, await loanSvc.confirmRepaymentReceived(req.params.id, req.user.id), 'Repayment confirmed'))
+
+// Dispute (either party)
+router.post('/:id/dispute', async (req,res) => ok(res, await loanSvc.raiseDispute(req.params.id, req.user.id, req.body?.reason), 'Dispute raised'))
 
 // Cancel loan request (borrowers only)
 router.post('/:id/cancel', restrictTo('BORROWER'), async (req,res) => ok(res, await loanSvc.cancelLoan(req.user.id, req.params.id), 'Loan request cancelled'))

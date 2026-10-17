@@ -8,7 +8,7 @@
 ## Commit Format
 - Use imperative style:
   - `feat(auth): add OTP resend cooldown`
-  - `fix(payments): handle Razorpay network errors`
+  - `fix(auth): handle expired refresh tokens`
   - `docs(deploy): add Render + Vercel setup guide`
 
 ## Local Setup

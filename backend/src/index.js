@@ -7,23 +7,12 @@ const morgan = require("morgan");
 const hpp = require("hpp");
 const { errorHandler } = require("./middleware/errorHandler");
 const { globalRateLimiter } = require("./middleware/rateLimiter");
-const { validateEnv, corsOrigins, paymentProvider } = require("./config/env");
+const { validateEnv, corsOrigins } = require("./config/env");
 const logger = require("./config/logger");
 
 const { checkAndConnectAll } = require("./utils/connectionChecks");
 
-try {
-  validateEnv();
-} catch (e) {
-  if (
-    /razorpay/i.test(String(e.message || "")) &&
-    /placeholder|PASTE_/i.test(String(e.message || ""))
-  ) {
-    logger.warn(`ENV warning: ${e.message}`);
-  } else {
-    throw e;
-  }
-}
+validateEnv();
 
 const app = express();
 
@@ -41,35 +30,38 @@ app.use(hpp());
 app.use(
   cors({
     origin(origin, callback) {
+      // Non-browser clients (curl, server-to-server, health checks) send no Origin.
       if (!origin) return callback(null, true);
       const allowedList = corsOrigins();
-      const isVercelDomain = /\.vercel\.app$/i.test(new URL(origin).hostname);
-      const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
-      if (allowedList.includes(origin) || isVercelDomain || isLocalhost) {
-        return callback(null, true);
+      const isProd = (process.env.NODE_ENV || "development") === "production";
+      // In production the only accepted origins are the explicit allowlist
+      // (CORS_ORIGINS env + configured frontend URLs). We deliberately do NOT
+      // trust every *.vercel.app host: with credentials enabled that would let
+      // any attacker-controlled Vercel deployment call the API on a user's
+      // behalf. Preview deployments should be added to CORS_ORIGINS explicitly.
+      if (allowedList.includes(origin)) return callback(null, true);
+      // Outside production, allow localhost dev servers and Vercel preview
+      // builds for convenience only.
+      if (!isProd) {
+        const isVercelPreview = /\.vercel\.app$/i.test(new URL(origin).hostname);
+        const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
+        if (isVercelPreview || isLocalhost) return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
   }),
 );
-app.use(
-  "/api/payments/webhook",
-  express.raw({ type: "application/json", limit: "1mb" }),
-);
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
-app.use("/api", (req, res, next) => {
-  if (req.path === "/payments/webhook") return next();
-  return globalRateLimiter(req, res, next);
-});
+app.use("/api", globalRateLimiter);
 
 app.get("/health", (_, res) =>
   res.json({
     status: "ok",
     time: new Date(),
-    paymentProvider: paymentProvider(),
+    mode: "record-only",
   }),
 );
 
@@ -99,7 +91,6 @@ app.get("/api", (_, res) =>
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use("/api/users", require("./routes/user.routes"));
 app.use("/api/loans", require("./routes/loan.routes"));
-app.use("/api/payments", require("./routes/payment.routes"));
 app.use("/api/admin", require("./routes/admin.routes"));
 app.use((_, res) =>
   res.status(404).json({ success: false, message: "Route not found" }),
@@ -109,26 +100,49 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const { sweepDelinquency } = require('./services/loan.service')
+const { runMaintenance } = require('./jobs/maintenance')
 
 const startBackgroundJobs = () => {
-  const SWEEP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
-  setTimeout(async () => {
-    try {
-      const stats = await sweepDelinquency()
-      logger.info(`[Background Job] Initial delinquency sweep: ${JSON.stringify(stats)}`)
-    } catch (e) {
-      logger.error(`[Background Job] Initial delinquency sweep failed: ${e.message}`)
-    }
-  }, 10000)
+  const SWEEP_INTERVAL_MS = Number(process.env.SWEEP_INTERVAL_MS || 60 * 60 * 1000) // 1 hour
+  const MAINTENANCE_INTERVAL_MS = Number(process.env.MAINTENANCE_INTERVAL_MS || 6 * 60 * 60 * 1000) // 6 hours
 
-  setInterval(async () => {
+  // In-process re-entrancy guard: a slow sweep must not overlap the next tick
+  // (overlapping sweeps previously double-applied delinquency penalties).
+  let sweepRunning = false
+  let maintenanceRunning = false
+
+  const runSweep = async (label) => {
+    if (sweepRunning) {
+      logger.warn(`[Background Job] Sweep already running; skipping ${label}`)
+      return
+    }
+    sweepRunning = true
     try {
       const stats = await sweepDelinquency()
-      logger.info(`[Background Job] Scheduled delinquency sweep: ${JSON.stringify(stats)}`)
+      logger.info(`[Background Job] ${label} delinquency sweep: ${JSON.stringify(stats)}`)
     } catch (e) {
-      logger.error(`[Background Job] Scheduled delinquency sweep failed: ${e.message}`)
+      logger.error(`[Background Job] ${label} delinquency sweep failed: ${e.message}`)
+    } finally {
+      sweepRunning = false
     }
-  }, SWEEP_INTERVAL_MS)
+  }
+
+  const runCleanup = async (label) => {
+    if (maintenanceRunning) return
+    maintenanceRunning = true
+    try {
+      await runMaintenance()
+      if (label) logger.info(`[Background Job] ${label} maintenance complete`)
+    } finally {
+      maintenanceRunning = false
+    }
+  }
+
+  setTimeout(() => runSweep('Initial'), 10000)
+  setTimeout(() => runCleanup('Initial'), 30000)
+
+  setInterval(() => runSweep('Scheduled'), SWEEP_INTERVAL_MS)
+  setInterval(() => runCleanup('Scheduled'), MAINTENANCE_INTERVAL_MS)
 }
 
 const start = async () => {
@@ -137,7 +151,7 @@ const start = async () => {
     app.listen(PORT, () => {
       logger.info(`UniFi API -> http://localhost:${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
-      logger.info(`Payment provider: ${paymentProvider()}`);
+      logger.info("Mode: record-only (non-custodial)");
       startBackgroundJobs();
     });
   } catch (e) {

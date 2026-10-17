@@ -14,7 +14,7 @@ const {
   verifyOtp,
   otpExpiresAt,
 } = require("../utils/otp");
-const { sendOtpChannels, smsRealEnabled } = require("./notification.service");
+const { sendOtpChannels } = require("./notification.service");
 const { createId } = require("@paralleldrive/cuid2");
 
 const recordDeviceSession = async (userId, reqInfo = {}) => {
@@ -41,16 +41,18 @@ const recordDeviceSession = async (userId, reqInfo = {}) => {
 };
 const {
   allowedEmailDomains,
-  allowedEmailSuffixes,
   normalizeEmail,
   isAllowedUniversityEmail,
+  emailDomainOf,
 } = require("../config/university");
 
 const err = (msg, code = 400) =>
   Object.assign(new Error(msg), { statusCode: code });
-const isDev = (process.env.NODE_ENV || "development") !== "production";
-const exposeDevOtp = false;
 const adminRoles = ["SUPER_ADMIN", "MOD_ADMIN", "FINANCE_ADMIN"];
+// OTP purposes a client is allowed to (re)request via /resend-otp. LOGIN and
+// UPI_VERIFY are reserved in the schema but have no issuing flow, so they are
+// deliberately excluded here.
+const RESENDABLE_OTP_PURPOSES = ["EMAIL_VERIFY", "PASSWORD_RESET", "ADMIN_2FA"];
 const portalRoleMap = {
   BORROWER: ["BORROWER"],
   PROVIDER: ["PROVIDER"],
@@ -87,21 +89,38 @@ const register = async ({
 }) => {
   const normalizedEmail = normalizeEmail(email);
   const normalizedPhone = normalizePhone(phone);
-  if (!isAllowedUniversityEmail(normalizedEmail)) {
-    throw err(`Only @${getAllowedDomainsText()} email addresses are allowed`);
-  }
+  const domain = emailDomainOf(normalizedEmail);
 
-  const university = await prisma.university.findFirst({
-    where: {
-      emailDomain: { in: allowedEmailDomains },
-      isActive: true,
-    },
+  // The campus list in the database is the source of truth: a domain that has
+  // an active University row is allowed. The ALLOWED_UNIVERSITY_DOMAINS env var
+  // is the bootstrap allow-list used to self-heal a missing row (below).
+  let university = await prisma.university.findFirst({
+    where: { emailDomain: domain, isActive: true },
   });
-  if (!university)
-    throw err(
-      `University configuration missing for @${getAllowedDomainsText()}`,
-      500,
-    );
+
+  if (!university) {
+    if (!isAllowedUniversityEmail(normalizedEmail)) {
+      throw err(`Only @${getAllowedDomainsText()} email addresses are allowed`);
+    }
+    // Self-heal: the domain is in ALLOWED_UNIVERSITY_DOMAINS, so it is a
+    // first-class campus. Create the missing row instead of failing
+    // registration (previously a 500 until the seed ran).
+    const knownNames = {
+      "lpu.in": "Lovely Professional University",
+      "rguktn.ac.in": "Rajiv Gandhi University of Knowledge and Technologies",
+    };
+    university = await prisma.university.create({
+      data: {
+        id: createId(),
+        name: knownNames[domain] || domain,
+        shortName: domain.split(".")[0].toUpperCase(),
+        emailDomain: domain,
+        city: "Unknown",
+        state: "Unknown",
+        isActive: true,
+      },
+    });
+  }
 
   const roleEmailExists = await prisma.user.findFirst({
     where: { email: normalizedEmail, role },
@@ -128,18 +147,21 @@ const register = async ({
     },
   });
 
-  const otp = await sendOtp(user.id, normalizedEmail, "EMAIL_VERIFY");
+  await sendOtp(user.id, normalizedEmail, "EMAIL_VERIFY");
   return {
-    message:
-      normalizedPhone && smsRealEnabled
-        ? "Account created. OTP sent to your email and phone (fallback)."
-        : "Account created. Check your email for the OTP.",
-    ...(exposeDevOtp && { devOtp: otp }),
+    message: "Account created. Check your email for the OTP.",
   };
 };
 
 const sendOtp = async (userId, email, purpose) => {
   const otp = generateOtp();
+
+  // Invalidate any prior live OTPs for this user+purpose so only the newest code
+  // is ever valid (prevents older, still-unexpired codes from being reused).
+  await prisma.otpCode.updateMany({
+    where: { userId, purpose, used: false },
+    data: { used: true },
+  });
 
   const rec = await prisma.otpCode.create({
     data: {
@@ -184,7 +206,7 @@ const findUsersByPortal = async (email, requestedRole) => {
   });
 };
 
-const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
+const verifyEmailOtp = async ({ email, otp, requestedRole }) => {
   const normalizedEmail = normalizeEmail(email);
   const requested = normalizeRequestedRole(requestedRole);
 
@@ -194,10 +216,14 @@ const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
     throw err("User not found", 404);
   }
 
+  // This endpoint verifies email ownership only. It must NEVER issue login
+  // tokens for other OTP purposes (PASSWORD_RESET / ADMIN_2FA / LOGIN) — those
+  // have their own dedicated flows (resetPassword, login+twoFaCode). Matching is
+  // therefore hard-scoped to EMAIL_VERIFY regardless of any client-supplied purpose.
   const recs = await prisma.otpCode.findMany({
     where: {
       userId: { in: users.map((u) => u.id) },
-      ...(purpose ? { purpose } : {}),
+      purpose: "EMAIL_VERIFY",
       used: false,
       expiresAt: { gt: new Date() },
     },
@@ -234,15 +260,12 @@ const verifyEmailOtp = async ({ email, otp, purpose, requestedRole }) => {
     data: { used: true },
   });
 
-  if (matched.purpose === "EMAIL_VERIFY" || purpose === "EMAIL_VERIFY") {
-    await prisma.user.update({
-      where: { id: matched.user.id },
-      data: { emailVerified: true },
-    });
-    return { message: "Email verified. You can now log in." };
-  }
+  await prisma.user.update({
+    where: { id: matched.user.id },
+    data: { emailVerified: true },
+  });
 
-  return issueTokens(matched.user);
+  return { message: "Email verified. You can now log in." };
 };
 
 const login = async ({ email, password, requestedRole, twoFaCode }, reqInfo = {}) => {
@@ -299,12 +322,11 @@ const login = async ({ email, password, requestedRole, twoFaCode }, reqInfo = {}
   const isAdmin = adminRoles.includes(targetUser.role) || requested === "ADMIN";
   if (isAdmin) {
     if (!twoFaCode) {
-      const otp = await sendOtp(targetUser.id, targetUser.email, "ADMIN_2FA");
+      await sendOtp(targetUser.id, targetUser.email, "ADMIN_2FA");
       return {
         requires2FA: true,
         email: targetUser.email,
         message: "2FA authentication code sent to admin email.",
-        ...(exposeDevOtp && { devOtp: otp }),
       };
     }
 
@@ -369,20 +391,32 @@ const issueTokens = async (user) => {
 };
 
 const refresh = async (token) => {
-  if (!token) throw err("No refresh token", 401);
-  const decoded = verifyRefreshToken(token);
+  if (!token || typeof token !== "string") throw err("No refresh token", 401);
+  let decoded;
+  try {
+    decoded = verifyRefreshToken(token);
+  } catch {
+    throw err("Invalid refresh token", 401);
+  }
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash: hashToken(token) },
   });
   if (!stored || stored.revokedAt || stored.expiresAt < new Date())
     throw err("Invalid refresh token", 401);
 
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
+  // Atomic single-use rotation: only the request that claims the token may
+  // mint the next pair. A parallel replay loses the claim and gets a 401.
+  const claimed = await prisma.refreshToken.updateMany({
+    where: { id: stored.id, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+  if (claimed.count !== 1) throw err("Invalid refresh token", 401);
+
   const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
   if (!user) throw err("User not found", 404);
+  if (user.isBanned || user.isSuspended || !user.isActive) {
+    throw err("Account is not active. Contact support.", 403);
+  }
   return issueTokens(user);
 };
 
@@ -398,22 +432,25 @@ const logout = async (token) => {
 
 const resendOtp = async (email, purpose, requestedRole) => {
   const normalizedEmail = normalizeEmail(email);
-  let requested = normalizeRequestedRole(requestedRole);
+  const requested = normalizeRequestedRole(requestedRole);
+  // Only allow known, issuable purposes; anything else falls back to email
+  // verification rather than letting a caller trigger arbitrary OTP mails.
+  const safePurpose = RESENDABLE_OTP_PURPOSES.includes(String(purpose || "").toUpperCase())
+    ? String(purpose).toUpperCase()
+    : "EMAIL_VERIFY";
 
   let users = await findUsersByPortal(normalizedEmail, requested);
   if (!users.length && requested) {
     users = await findUsersByPortal(normalizedEmail, undefined);
   }
-  if (!users.length) {
-    throw err("No account found for this email address.", 404);
-  }
 
-  const targetUser = users[0];
-  const otp = await sendOtp(targetUser.id, normalizedEmail, purpose || "EMAIL_VERIFY");
-  return {
-    message: "OTP sent",
-    ...(exposeDevOtp && { devOtp: otp }),
-  };
+  // Always return the same generic response whether or not the account exists,
+  // so this endpoint can't be used to enumerate registered emails. If a matching
+  // account is found we send; otherwise we silently no-op.
+  if (users.length) {
+    await sendOtp(users[0].id, normalizedEmail, safePurpose);
+  }
+  return { message: "If an account exists for this email, an OTP has been sent." };
 };
 
 const forgotPassword = async ({ email, requestedRole }) => {
@@ -426,11 +463,10 @@ const forgotPassword = async ({ email, requestedRole }) => {
   }
 
   const targetUser = users[0];
-  const otp = await sendOtp(targetUser.id, normalizedEmail, "PASSWORD_RESET");
+  await sendOtp(targetUser.id, normalizedEmail, "PASSWORD_RESET");
 
   return {
     message: "If an account exists with this email, a password reset OTP has been sent.",
-    ...(exposeDevOtp && { devOtp: otp }),
   };
 };
 
@@ -478,6 +514,53 @@ const resetPassword = async ({ email, otp, newPassword, requestedRole }) => {
   return { message: "Password reset successful. You may now log in with your new password." };
 };
 
+const changePassword = async (userId, { currentPassword, newPassword }) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw err("User not found", 404);
+
+  const matches = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!matches) throw err("Current password is incorrect", 400);
+
+  const sameAsOld = await bcrypt.compare(newPassword, user.passwordHash);
+  if (sameAsOld) throw err("New password must be different from the current one", 400);
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+
+  // Update the password and revoke all existing refresh tokens so any other
+  // sessions are forced to re-authenticate with the new credentials.
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
+
+  return { message: "Password changed. Please sign in again on other devices." };
+};
+
+const updateProfile = async (userId, { firstName, lastName, phone }) => {
+  const data = {};
+  if (firstName !== undefined) data.firstName = firstName;
+  if (lastName !== undefined) data.lastName = lastName;
+  if (phone !== undefined) data.phone = normalizePhone(phone);
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data,
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      kycStatus: true,
+    },
+  });
+  return user;
+};
+
 module.exports = {
   register,
   login,
@@ -487,4 +570,6 @@ module.exports = {
   resendOtp,
   forgotPassword,
   resetPassword,
+  changePassword,
+  updateProfile,
 };

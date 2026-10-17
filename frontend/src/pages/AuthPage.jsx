@@ -25,11 +25,20 @@ export default function AuthPage() {
   const { user, accessToken, login, register, verifyOtp, resendOtp, forgotPassword, resetPassword, loading } = useAuth();
   const { isDark, toggleTheme } = useTheme();
 
+  // After a successful login, bounce back to the protected page the user was
+  // originally trying to reach (ProtectedRoute passes ?redirect=<path>). Only
+  // honor internal absolute paths to avoid open-redirects to external origins.
+  const redirectTo = useMemo(() => {
+    const target = new URLSearchParams(location.search).get("redirect") || "";
+    if (target.startsWith("/") && !target.startsWith("//")) return target;
+    return "/portal";
+  }, [location.search]);
+
   useEffect(() => {
     if (user && accessToken) {
-      navigate("/portal", { replace: true });
+      navigate(redirectTo, { replace: true });
     }
-  }, [user, accessToken, navigate]);
+  }, [user, accessToken, navigate, redirectTo]);
 
   const [tab, setTab] = useState("login");
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
@@ -50,14 +59,14 @@ export default function AuthPage() {
     otp: "",
     newPassword: "",
     step: 1,
-    requestedRole: "ADMIN",
+    requestedRole: "BORROWER",
   });
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [universities, setUniversities] = useState([]);
   const allowedDomains = universities.map((u) => u.emailDomain);
-  const allowedDomain = allowedDomains[0] || "lpu.in";
+  const allowedDomain = allowedDomains[0] || "";
   const allowedDomainsText =
     allowedDomains.length > 1 ? allowedDomains.join(" or ") : allowedDomain;
 
@@ -133,7 +142,7 @@ export default function AuthPage() {
         return;
       }
 
-      navigate("/portal");
+      navigate(redirectTo);
     } catch (err) {
       setError(parseError(err));
     }
@@ -143,7 +152,7 @@ export default function AuthPage() {
     setMessage("");
     setError("");
     try {
-      await resendOtp(loginForm.email, "ADMIN_2FA", "ADMIN");
+      await resendOtp(loginForm.email, "ADMIN", "ADMIN_2FA");
       setMessage("New 2FA authentication code sent to your registered email.");
     } catch (err) {
       setError(parseError(err));
@@ -198,12 +207,17 @@ export default function AuthPage() {
     const normalizedEmail = String(registerForm.email || "")
       .trim()
       .toLowerCase();
-    const isValidDomain = allowedDomains.some((domain) =>
-      normalizedEmail.endsWith(`@${domain}`),
-    );
-    if (!isValidDomain) {
-      setError(`Only @${allowedDomainsText} emails are allowed.`);
-      return;
+    // Client-side domain check is a courtesy only; the backend is the source
+    // of truth. If the university list failed to load we let the backend
+    // validate instead of blocking every signup with a stale hardcoded domain.
+    if (allowedDomains.length > 0) {
+      const isValidDomain = allowedDomains.some((domain) =>
+        normalizedEmail.endsWith(`@${domain}`),
+      );
+      if (!isValidDomain) {
+        setError(`Only ${allowedDomainsText} emails are allowed.`);
+        return;
+      }
     }
     if (registerForm.phone && !isValidPhone(registerForm.phone)) {
       setError("Phone must be in format like +919876543210.");

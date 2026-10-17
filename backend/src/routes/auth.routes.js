@@ -83,7 +83,7 @@ router.post("/forgot-password", otpRateLimiter, validate(forgotPasswordSchema), 
 router.post("/reset-password", authRateLimiter, validate(resetPasswordSchema), async (req, res) =>
   ok(res, await authSvc.resetPassword(req.body)),
 );
-router.post("/refresh", async (req, res) =>
+router.post("/refresh", authRateLimiter, async (req, res) =>
   ok(res, await authSvc.refresh(req.body.refreshToken)),
 );
 router.post("/logout", protect, async (req, res) =>

@@ -1,11 +1,13 @@
-const TENURE_DAYS = { SEVEN: 7, FOURTEEN: 14, THIRTY: 30 }
-const calculateLoan = (principal, tenure, interestRate, platformFeeRate) => {
-  const interestAmount    = Math.round(principal * (interestRate   / 100))
-  const platformFeeAmount = Math.round(interestAmount * (platformFeeRate / 100))
-  const totalRepayAmount  = principal + interestAmount
-  const providerEarning   = interestAmount - platformFeeAmount
-  const dueAt = new Date(); dueAt.setDate(dueAt.getDate() + TENURE_DAYS[tenure])
-  return { interestAmount, platformFeeAmount, totalRepayAmount, providerEarning, dueAt }
-}
-const generatePublicId = (seq) => `UniFi#${String(seq).padStart(5,'0')}`
-module.exports = { calculateLoan, generatePublicId, TENURE_DAYS }
+// UniFi is non-custodial and interest-free. Peers settle money directly between
+// themselves, so the platform never computes interest, fees or earnings: a
+// loan's repayable amount is exactly its principal.
+const calculateLoan = (principalAmount) => ({
+  interestAmount: 0,
+  platformFeeAmount: 0,
+  totalRepayAmount: principalAmount,
+  providerEarning: 0,
+})
+
+const generatePublicId = (seq) => `UniFi#${String(seq).padStart(5, '0')}`
+
+module.exports = { calculateLoan, generatePublicId }

@@ -476,7 +476,7 @@
       <div style="background: rgba(0,208,156,0.06); border: 1px solid rgba(0,208,156,0.2); border-radius:14px; padding:16px; text-align:center;">
         <div style="font-size:1.5rem;margin-bottom:8px;">📈</div>
         <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--green);font-size:0.9rem;">PROVIDER</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Green accent — growth, earnings, returns</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">Green accent — growth, trust, success</div>
       </div>
     </div>
   </div>
@@ -657,7 +657,7 @@
       </div>
       <div class="screen-info">
         <div class="screen-name">Loan Request Builder</div>
-        <div class="screen-desc">Slider for amount. Tenure selector (7/14/30 days). Live breakdown card: principal + interest + fee = total repay. Purpose tags. One-tap submit.</div>
+        <div class="screen-desc">Slider for amount. Tenure selector (7/14/30 days). Live breakdown card: principal = total repay (zero interest, zero fee). Purpose tags. One-tap submit.</div>
         <div class="screen-chips"><span class="chip">Amount Slider</span><span class="chip">Tenure Picker</span><span class="chip">Live Calc</span><span class="chip">Purpose Tags</span></div>
       </div>
     </div>
@@ -717,8 +717,8 @@
       </div>
       <div class="screen-info">
         <div class="screen-name">Loan Marketplace</div>
-        <div class="screen-desc">Anonymous loan cards showing: amount, tenure, credit score badge, expected return %. Sort/filter by tenure, return rate, credit score. Animated "Fund Now" CTA.</div>
-        <div class="screen-chips"><span class="chip">Filter Pills</span><span class="chip">Loan Cards</span><span class="chip">Anon IDs</span><span class="chip">Return Rate</span></div>
+        <div class="screen-desc">Anonymous loan cards showing: amount, tenure, credit score badge, purpose. Sort/filter by tenure, amount, credit score. Animated "Fund Now" CTA.</div>
+        <div class="screen-chips"><span class="chip">Filter Pills</span><span class="chip">Loan Cards</span><span class="chip">Anon IDs</span><span class="chip">Credit Score</span></div>
       </div>
     </div>
 
@@ -755,8 +755,8 @@
       </div>
       <div class="screen-info">
         <div class="screen-name">Provider Dashboard</div>
-        <div class="screen-desc">Total lent, total earned, portfolio return %. Active loans with repayment countdown rings. Earnings chart. Withdraw CTA. Provider rating badge.</div>
-        <div class="screen-chips"><span class="chip">Earnings</span><span class="chip">Active Loans</span><span class="chip">Portfolio</span><span class="chip">Withdraw</span></div>
+        <div class="screen-desc">Total lent and principal returned. Active loans with repayment countdown rings. Lending record — no earnings, since UniFi is interest-free. Provider rating badge.</div>
+        <div class="screen-chips"><span class="chip">Principal Lent</span><span class="chip">Active Loans</span><span class="chip">Portfolio</span><span class="chip">Trust Score</span></div>
       </div>
     </div>
 
@@ -790,7 +790,7 @@
       </div>
       <div class="screen-info">
         <div class="screen-name">Admin Dashboard</div>
-        <div class="screen-desc">Platform revenue, user counts, loan volumes at a glance. Real-time transaction table. KYC queue. Flagged account alerts. Blue-accent authority aesthetic.</div>
+        <div class="screen-desc">Platform health, user counts, loan volumes at a glance. Real-time ledger table. KYC queue. Dispute and flagged-account alerts. Blue-accent authority aesthetic.</div>
         <div class="screen-chips"><span class="chip">Platform Stats</span><span class="chip">User Table</span><span class="chip">KYC Queue</span><span class="chip">Alerts</span></div>
       </div>
     </div>
@@ -813,9 +813,9 @@
         </div>
       </div>
       <div class="screen-info">
-        <div class="screen-name">Payment / Repay Screen</div>
-        <div class="screen-desc">Amount breakdown card (principal + interest + fee). UPI QR or deep-link launch. Real-time Razorpay status. Success/failure animated state screen.</div>
-        <div class="screen-chips"><span class="chip">Breakdown</span><span class="chip">UPI Flow</span><span class="chip">Success State</span></div>
+        <div class="screen-name">Handover / Repay Screen</div>
+        <div class="screen-desc">Confirmation card (principal only — zero interest, zero fee). Peer settles via UPI/cash, then both sides confirm in-app. Success/failure animated state screen.</div>
+        <div class="screen-chips"><span class="chip">Confirm Handover</span><span class="chip">UPI / Cash</span><span class="chip">Success State</span></div>
       </div>
     </div>
 
@@ -1020,8 +1020,8 @@
         </div>
       </div>
       <div class="visual-info">
-        <div class="visual-name">Earnings Charts</div>
-        <div class="visual-desc">Line charts with gold gradient fill for provider earnings. Green for repayment progress. Minimalist axes, no gridlines.</div>
+        <div class="visual-name">Lending Activity Charts</div>
+        <div class="visual-desc">Line charts with gold gradient fill for principal deployed. Green for repayment progress. Minimalist axes, no gridlines.</div>
       </div>
     </div>
     <div class="visual-card">
@@ -1259,12 +1259,12 @@
   </div>
 
   <div id="journey-provider" class="portal-wrapper">
-    <div style="margin-bottom:16px;font-size:0.8rem;color:var(--muted);">Provider journey from joining to earning returns</div>
+    <div style="margin-bottom:16px;font-size:0.8rem;color:var(--muted);">Provider journey from joining to building campus trust</div>
     <div class="journey-flow">
       <div class="j-step" style="border-color:rgba(0,208,156,0.3)">
         <div class="j-step-num">STEP 1</div>
         <div class="j-step-name" style="color:var(--green)">Landing Page</div>
-        <div class="j-step-desc">Sees "Earn returns within your campus." Clicks "Become Provider"</div>
+        <div class="j-step-desc">Sees "Lend within your campus." Clicks "I want to Lend"</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
@@ -1276,37 +1276,37 @@
       <div class="j-step">
         <div class="j-step-num">STEP 3</div>
         <div class="j-step-name">Dashboard</div>
-        <div class="j-step-desc">Total lent, earned, and "Browse Marketplace" CTA.</div>
+        <div class="j-step-desc">Principal lent, principal returned, and "Browse Marketplace" CTA.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
         <div class="j-step-num">STEP 4</div>
         <div class="j-step-name">Marketplace</div>
-        <div class="j-step-desc">Browse anon loan cards. Filter by tenure/credit score/return %.</div>
+        <div class="j-step-desc">Browse anon loan cards. Filter by tenure/credit score/amount.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
         <div class="j-step-num">STEP 5</div>
         <div class="j-step-name">Fund Loan</div>
-        <div class="j-step-desc">Tap "Fund Now" → see breakdown → confirm → UPI payment to escrow.</div>
+        <div class="j-step-desc">Tap "Fund Now" → confirm → send to the borrower directly (UPI/cash) → mark handover sent.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
         <div class="j-step-num">STEP 6</div>
         <div class="j-step-name">Active Tracking</div>
-        <div class="j-step-desc">Loan appears in "My Active Loans" with repayment countdown.</div>
+        <div class="j-step-desc">Borrower confirms receipt → loan goes active with a repayment countdown.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step" style="border-color:rgba(0,208,156,0.3)">
         <div class="j-step-num">STEP 7</div>
-        <div class="j-step-name" style="color:var(--green)">Repayment Received</div>
-        <div class="j-step-desc">Borrower repays → platform deducts fee → ₹ credited to provider wallet.</div>
+        <div class="j-step-name" style="color:var(--green)">Repayment Confirmed</div>
+        <div class="j-step-desc">Borrower attests the repayment → you confirm receipt → loan marked repaid. No fee, no interest.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
         <div class="j-step-num">STEP 8</div>
-        <div class="j-step-name">Withdraw</div>
-        <div class="j-step-desc">Transfer earnings to bank via UPI from wallet screen.</div>
+        <div class="j-step-name">Trust Grows</div>
+        <div class="j-step-desc">On-time lending raises your standing and marketplace reputation.</div>
       </div>
     </div>
   </div>
@@ -1323,7 +1323,7 @@
       <div class="j-step">
         <div class="j-step-num">TASK 2</div>
         <div class="j-step-name">Overview Dash</div>
-        <div class="j-step-desc">Platform stats: revenue, active loans, new signups, alerts.</div>
+        <div class="j-step-desc">Platform stats: active loans, open disputes, new signups, alerts.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
@@ -1346,14 +1346,14 @@
       <div class="j-arrow">→</div>
       <div class="j-step">
         <div class="j-step-num">TASK 6</div>
-        <div class="j-step-name">Fee Config</div>
-        <div class="j-step-desc">Adjust interest rates, platform fee %, loan limits. Changes take effect on next request.</div>
+        <div class="j-step-name">Limits Config</div>
+        <div class="j-step-desc">Adjust loan limits, score tiers and funding windows. Changes take effect on next request.</div>
       </div>
       <div class="j-arrow">→</div>
       <div class="j-step">
         <div class="j-step-num">TASK 7</div>
-        <div class="j-step-name">Reports</div>
-        <div class="j-step-desc">Monthly revenue, default rates, cohort analysis. Export CSV.</div>
+        <div class="j-step-name">Reports & Disputes</div>
+        <div class="j-step-desc">Default rates, open disputes, cohort analysis. Export CSV.</div>
       </div>
     </div>
   </div>

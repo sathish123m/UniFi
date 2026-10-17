@@ -13,7 +13,7 @@ const hasMigrationDirs = () => {
   return fs.readdirSync(migrationsPath, { withFileTypes: true }).some((entry) => entry.isDirectory())
 }
 
-const shouldSeed = () => String(process.env.DB_SEED_ON_DEPLOY || 'true').toLowerCase() === 'true'
+const shouldSeed = () => String(process.env.DB_SEED_ON_DEPLOY || 'false').toLowerCase() === 'true'
 
 const main = () => {
   if (hasMigrationDirs()) {

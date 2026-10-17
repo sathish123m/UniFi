@@ -17,9 +17,17 @@ const isAllowedUniversityEmail = (email) => {
   return allowedEmailSuffixes.some((suffix) => normalized.endsWith(suffix));
 };
 
+// Extract the domain portion of an email (e.g. "a@lpu.in" → "lpu.in").
+const emailDomainOf = (email) => {
+  const normalized = normalizeEmail(email);
+  const at = normalized.lastIndexOf("@");
+  return at === -1 ? "" : normalized.slice(at + 1);
+};
+
 module.exports = {
   allowedEmailDomains,
   allowedEmailSuffixes,
   normalizeEmail,
   isAllowedUniversityEmail,
+  emailDomainOf,
 };

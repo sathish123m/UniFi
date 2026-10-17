@@ -1,4 +1,16 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://unifi-backend-u99t.onrender.com/api'
+// The API base URL must be provided via VITE_API_URL at build time. We do NOT
+// hardcode a production backend URL as a fallback: a stale hostname baked into
+// the bundle silently points every request at the wrong (or a decommissioned)
+// server. In dev, default to the local backend; in a real build a missing
+// VITE_API_URL is a configuration error we surface loudly.
+const resolveApiBase = () => {
+  const configured = import.meta.env.VITE_API_URL
+  if (configured) return configured
+  if (import.meta.env.DEV) return 'http://localhost:5050/api'
+  throw new Error('VITE_API_URL is not set. Configure it in your deployment environment.')
+}
+
+const API_BASE = resolveApiBase()
 const STORAGE_KEY = 'unifi_auth_v1'
 
 const parseBody = async (res) => {
@@ -11,16 +23,58 @@ const parseBody = async (res) => {
   }
 }
 
-let isRefreshing = false
-let refreshSubscribers = []
+// A single in-flight refresh is shared by every request that hits a 401 while
+// it runs. This prevents a burst of concurrent 401s from each firing their own
+// /auth/refresh — which, with refresh-token rotation, would revoke each other's
+// tokens and spuriously log the user out.
+let refreshPromise = null
 
-const subscribeTokenRefresh = (cb) => {
-  refreshSubscribers.push(cb)
-}
+const runTokenRefresh = () => {
+  if (refreshPromise) return refreshPromise
 
-const onRefreshed = (newToken) => {
-  refreshSubscribers.forEach((cb) => cb(newToken))
-  refreshSubscribers = []
+  refreshPromise = (async () => {
+    let stored = {}
+    try {
+      stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    } catch {
+      stored = {}
+    }
+    const rt = stored.refreshToken
+    if (!rt) return null
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: rt }),
+      })
+      const refreshRes = await parseBody(res)
+
+      if (refreshRes && refreshRes.success && refreshRes.data?.accessToken) {
+        const updatedSession = {
+          accessToken: refreshRes.data.accessToken,
+          refreshToken: refreshRes.data.refreshToken || rt,
+          user: refreshRes.data.user || stored.user,
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSession))
+        window.dispatchEvent(new CustomEvent('unifi_auth_update', { detail: updatedSession }))
+        return updatedSession.accessToken
+      }
+
+      localStorage.removeItem(STORAGE_KEY)
+      window.dispatchEvent(new CustomEvent('unifi_auth_clear'))
+      return null
+    } catch {
+      localStorage.removeItem(STORAGE_KEY)
+      window.dispatchEvent(new CustomEvent('unifi_auth_clear'))
+      return null
+    } finally {
+      // Release the shared slot only after all current awaiters have resolved.
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
 }
 
 const request = async ({ path, method = 'GET', token, body, isMultipart = false, isRetry = false }) => {
@@ -48,54 +102,9 @@ const request = async ({ path, method = 'GET', token, body, isMultipart = false,
 
   // ── Automatic 401 token refresh & retry interceptor ────────────────────────
   if (res.status === 401 && !isRetry && !path.startsWith('/auth/login') && !path.startsWith('/auth/refresh')) {
-    try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-      const rt = stored.refreshToken
-
-      if (rt) {
-        if (!isRefreshing) {
-          isRefreshing = true
-          fetch(`${API_BASE}/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken: rt }),
-          })
-            .then(parseBody)
-            .then((refreshRes) => {
-              isRefreshing = false
-              if (refreshRes && refreshRes.success && refreshRes.data?.accessToken) {
-                const updatedSession = {
-                  accessToken: refreshRes.data.accessToken,
-                  refreshToken: refreshRes.data.refreshToken || rt,
-                  user: refreshRes.data.user || stored.user,
-                }
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSession))
-                window.dispatchEvent(new CustomEvent('unifi_auth_update', { detail: updatedSession }))
-                onRefreshed(refreshRes.data.accessToken)
-              } else {
-                localStorage.removeItem(STORAGE_KEY)
-                window.dispatchEvent(new CustomEvent('unifi_auth_clear'))
-                onRefreshed(null)
-              }
-            })
-            .catch(() => {
-              isRefreshing = false
-              localStorage.removeItem(STORAGE_KEY)
-              window.dispatchEvent(new CustomEvent('unifi_auth_clear'))
-              onRefreshed(null)
-            })
-        }
-
-        const retryToken = await new Promise((resolve) => {
-          subscribeTokenRefresh((newToken) => resolve(newToken))
-        })
-
-        if (retryToken) {
-          return request({ path, method, token: retryToken, body, isMultipart, isRetry: true })
-        }
-      }
-    } catch {
-      // ignore parse errors and proceed to throw
+    const retryToken = await runTokenRefresh()
+    if (retryToken) {
+      return request({ path, method, token: retryToken, body, isMultipart, isRetry: true })
     }
   }
 

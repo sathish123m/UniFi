@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { ROLE_HOME } from '../App'
+import { ROLE_HOME } from '../lib/roles'
 
 export default function NotFoundPage() {
   const navigate = useNavigate()

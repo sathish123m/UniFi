@@ -10,16 +10,7 @@
  */
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-
-const ROLE_HOME = {
-  BORROWER: '/borrower/overview',
-  PROVIDER: '/provider/overview',
-  SUPER_ADMIN: '/admin/overview',
-  MOD_ADMIN: '/admin/overview',
-  FINANCE_ADMIN: '/admin/overview',
-}
-
-const ADMIN_ROLES = new Set(['SUPER_ADMIN', 'MOD_ADMIN', 'FINANCE_ADMIN'])
+import { ROLE_HOME, ADMIN_ROLES } from '../lib/roles'
 
 /**
  * @param {string[]}  allowedRoles  - Roles that may enter this subtree.
@@ -27,8 +18,18 @@ const ADMIN_ROLES = new Set(['SUPER_ADMIN', 'MOD_ADMIN', 'FINANCE_ADMIN'])
  * @param {boolean}   adminGroup    - If true, accepts any admin role variant.
  */
 export default function ProtectedRoute({ children, allowedRoles, adminGroup = false }) {
-  const { user, accessToken } = useAuth()
+  const { user, accessToken, bootstrapping } = useAuth()
   const location = useLocation()
+
+  // ── Layer 0: still resolving a persisted session on first load ───────────
+  if (bootstrapping) {
+    return (
+      <div className="center-screen">
+        <div className="portal-loading-spinner" />
+        <span style={{ marginTop: 14, fontSize: 14, color: '#64748b' }}>Loading portal…</span>
+      </div>
+    )
+  }
 
   // ── Layer 1: token must exist ────────────────────────────────────────────
   if (!accessToken) {
@@ -41,19 +42,25 @@ export default function ProtectedRoute({ children, allowedRoles, adminGroup = fa
     )
   }
 
-  // ── Layer 2: wait for user hydration ────────────────────────────────────
+  // ── Layer 2: token present but user could not be hydrated → re-auth ──────
+  // (Previously this rendered a spinner forever when the stored user was
+  // missing or a refresh returned no user object.)
   if (!user) {
     return (
-      <div className="center-screen">
-        <div className="portal-loading-spinner" />
-        <span style={{ marginTop: 14, fontSize: 14, color: '#64748b' }}>Loading portal…</span>
-      </div>
+      <Navigate
+        to={`/auth?redirect=${encodeURIComponent(location.pathname)}`}
+        replace
+        state={{ from: location.pathname }}
+      />
     )
   }
 
   // ── Layer 3: role enforcement ────────────────────────────────────────────
-  if (allowedRoles) {
-    const allowed = new Set(allowedRoles)
+  // Applied whenever a role scope is declared: either an explicit allow-list or
+  // the adminGroup shorthand. (Borrower/provider guards pass allowedRoles;
+  // the /admin tree passes adminGroup only.)
+  if (allowedRoles || adminGroup) {
+    const allowed = new Set(allowedRoles || [])
     const roleAllowed = adminGroup
       ? ADMIN_ROLES.has(user.role)
       : allowed.has(user.role)

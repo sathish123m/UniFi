@@ -1,5 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
 import { api } from '../lib/api'
+import { imageFileError } from '../lib/kycValidation'
+
+// Convert a canvas/file data URL (data:image/jpeg;base64,...) into a Blob so the
+// selfie can be uploaded as multipart/form-data. The JSON body parser on the
+// backend is capped at 10 KB, so posting the raw base64 string always failed.
+const dataUrlToBlob = (dataUrl) => {
+  const match = /^data:(image\/(png|jpe?g|webp));base64,(.+)$/i.exec(dataUrl || '')
+  if (!match) return null
+  const [, mimeType, , base64] = match
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return { blob: new Blob([bytes], { type: mimeType }), mimeType }
+}
 
 export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess }) {
   const [cameraActive, setCameraActive] = useState(false)
@@ -19,6 +33,24 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
       stopCamera()
     }
   }, [isOpen])
+
+  // Attach the stream once the <video> element is actually mounted. The video is
+  // only rendered when `cameraActive` is true, so assigning srcObject inside
+  // startCamera() (which flips cameraActive) can run before the element exists,
+  // leaving a live camera with a black preview. Re-attaching here fixes that race.
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [cameraActive])
+
+  // Close on Escape so keyboard users aren't trapped.
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -77,6 +109,12 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const validationError = imageFileError(file)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setError('')
     const reader = new FileReader()
     reader.onload = (evt) => {
       setCapturedSelfie(evt.target.result)
@@ -90,13 +128,20 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
       setError('Please capture or select a photo first.')
       return
     }
+    const converted = dataUrlToBlob(capturedSelfie)
+    if (!converted) {
+      setError('Unsupported image format. Please use JPG, PNG or WEBP.')
+      return
+    }
     setLoading(true)
     setError('')
     setSuccessMsg('')
 
     try {
-      await api.post('/users/kyc/liveness', { selfie: capturedSelfie }, accessToken)
-      setSuccessMsg('✓ Liveness selfie verified & saved to database!')
+      const formData = new FormData()
+      formData.append('selfie', converted.blob, `selfie.${converted.mimeType.split('/')[1]}`)
+      await api.post('/users/kyc/liveness', formData, accessToken, true)
+      setSuccessMsg('✓ Selfie submitted. Your KYC stays pending until an admin reviews it.')
       onSuccess?.()
       setTimeout(() => {
         onClose()
@@ -110,6 +155,9 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Identity selfie capture"
       style={{
         position: 'fixed',
         inset: 0,
@@ -163,10 +211,10 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
         </button>
 
         <h3 style={{ margin: '0 0 6px', fontSize: '1.25rem', fontFamily: 'Syne, sans-serif' }}>
-          📷 Live Webcam Face KYC
+          📷 Selfie Capture
         </h3>
         <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--card-muted, #8b949e)' }}>
-          Align your face in the frame or select a photo file to perform live facial verification.
+          Capture a clear selfie (or upload a photo). It is submitted with your KYC for an admin to review — approval is manual.
         </p>
 
         {error && (
@@ -318,7 +366,7 @@ export default function KycCameraModal({ isOpen, onClose, accessToken, onSuccess
                   fontSize: 14,
                 }}
               >
-                {loading ? 'Uploading...' : '🔒 Save Photo to DB'}
+                {loading ? 'Uploading...' : '🔒 Submit for Review'}
               </button>
             </>
           )}

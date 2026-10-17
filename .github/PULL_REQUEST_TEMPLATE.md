@@ -14,7 +14,7 @@
 - [ ] `npm run smoke`
 - [ ] Manual role login check (Admin/Borrower/Provider)
 - [ ] OTP flow check (register -> verify)
-- [ ] Payment flow check (MOCK or Razorpay Test)
+- [ ] Dual-confirmation IOU flow check (fund -> handover -> received)
 
 ## Security Checklist
 - [ ] No secrets committed (`.env` not tracked)
