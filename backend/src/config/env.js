@@ -24,8 +24,19 @@ const checkSecretStrength = () => {
 
 const checkEmailProviderConfig = () => {
   const provider = String(process.env.EMAIL_PROVIDER || 'SMTP').trim().toUpperCase()
-  if (!['SMTP', 'BREVO_API', 'MAILJET_API'].includes(provider)) {
-    logger.warn('[ENV] EMAIL_PROVIDER should be SMTP, BREVO_API or MAILJET_API')
+  if (!['SMTP', 'BREVO_API', 'MAILJET_API', 'GMAIL_SCRIPT'].includes(provider)) {
+    logger.warn('[ENV] EMAIL_PROVIDER should be SMTP, BREVO_API, MAILJET_API or GMAIL_SCRIPT')
+  }
+
+  if (provider === 'GMAIL_SCRIPT') {
+    const url = String(process.env.GMAIL_SCRIPT_URL || '').trim()
+    const secret = String(process.env.GMAIL_SCRIPT_SECRET || '').trim()
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)) {
+      logger.warn('[ENV] GMAIL_SCRIPT_URL missing or not an Apps Script /exec URL; email fallback will be used')
+    }
+    if (secret.length < 12) {
+      logger.warn('[ENV] GMAIL_SCRIPT_SECRET missing or too short; the relay will reject messages')
+    }
   }
 
   if (provider === 'BREVO_API') {
