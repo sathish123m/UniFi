@@ -42,6 +42,10 @@ jobs:
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/unifi_ci
+      # `prisma migrate diff --from-migrations` needs a *separate* empty
+      # database. Reusing DATABASE_URL here left its scratch schema behind and
+      # the following `migrate deploy` failed with P3005 (schema not empty).
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/unifi_shadow
       REDIS_URL: redis://localhost:6379
       JWT_ACCESS_SECRET: ci-access-secret-not-used
       JWT_REFRESH_SECRET: ci-refresh-secret-not-used
@@ -76,13 +80,17 @@ jobs:
         run: npx prisma validate
         working-directory: backend
 
+      # Dedicated, empty database for the drift check below.
+      - name: Create Shadow Database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE unifi_shadow;'
+
       # Fails the build if prisma/migrations no longer reproduces schema.prisma.
       - name: Check Migration Drift
         run: |
           npx prisma migrate diff \
             --from-migrations prisma/migrations \
             --to-schema-datamodel prisma/schema.prisma \
-            --shadow-database-url "$DATABASE_URL" \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
             --exit-code
         working-directory: backend
 
