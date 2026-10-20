@@ -149,6 +149,34 @@ const sendMailViaMailjetApi = async ({ to, subject, text, html }) => {
   return { messageId: 'mailjet-sent', response: `Mailjet API ${res.status}` }
 }
 
+// 4b. GOOGLE APPS SCRIPT RELAY
+// Third-party ESPs cannot authenticate a gmail.com From domain, so messages sent
+// as unifi.campus@gmail.com through Mailjet/Brevo fail DMARC alignment and get
+// filtered (Gmail files them under Spam, Microsoft 365 - which lpu.in uses -
+// quarantines them). An Apps Script web app runs inside the Google account and
+// hands the message to Gmail's own infrastructure, so SPF and DKIM align and the
+// mail is delivered like any normal Gmail message.
+//
+// The script is opt-in: set GMAIL_SCRIPT_URL (the /exec deployment URL) and
+// GMAIL_SCRIPT_SECRET (shared string the script compares against).
+const sendMailViaGmailScript = async ({ to, subject, text, html }) => {
+  const url = String(process.env.GMAIL_SCRIPT_URL || '').trim()
+  const secret = String(process.env.GMAIL_SCRIPT_SECRET || '').trim()
+  if (!url) throw new Error('GMAIL_SCRIPT_URL not set')
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secret, to, subject, text, html }),
+    redirect: 'follow',
+    signal: AbortSignal.timeout(15000),
+  })
+  const raw = (await res.text()).trim()
+  if (!res.ok) throw new Error(`Gmail script ${res.status}: ${raw.slice(0, 180)}`)
+  if (!/^ok\b/i.test(raw)) throw new Error(`Gmail script rejected: ${raw.slice(0, 120)}`)
+  return { messageId: `gmail-script-${Date.now()}`, response: 'Apps Script 200' }
+}
+
 // 5. PROVIDER SELECTION
 // EMAIL_PROVIDER chooses which transport is tried FIRST; the others always
 // remain in the chain as automatic fallbacks so a single provider outage never
@@ -158,6 +186,7 @@ const EMAIL_SENDERS = {
   RESEND_API: sendMailViaResendApi,
   BREVO_API: sendMailViaBrevoApi,
   MAILJET_API: sendMailViaMailjetApi,
+  GMAIL_SCRIPT: sendMailViaGmailScript,
 }
 
 const providerOrder = () => {
@@ -171,8 +200,9 @@ const providerOrder = () => {
     RESEND_API: Boolean(String(process.env.RESEND_API_KEY || '').trim()),
     BREVO_API: Boolean(String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || '').trim()),
     MAILJET_API: Boolean(String(process.env.MAILJET_API_KEY || '').trim() && String(process.env.MAILJET_API_SECRET || '').trim()),
+    GMAIL_SCRIPT: Boolean(String(process.env.GMAIL_SCRIPT_URL || '').trim()),
   }
-  const ready = ['SMTP', 'RESEND_API', 'BREVO_API', 'MAILJET_API'].filter((k) => hasCreds[k])
+  const ready = ['SMTP', 'GMAIL_SCRIPT', 'RESEND_API', 'BREVO_API', 'MAILJET_API'].filter((k) => hasCreds[k])
   if (!ready.length) return [preferred]
   return [preferred, ...ready.filter((k) => k !== preferred)]
 }
