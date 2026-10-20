@@ -16,28 +16,33 @@ const {
 } = require("../middleware/rateLimiter");
 const { ok } = require("../utils/response");
 const { allowedEmailDomains } = require("../config/university");
+const cache = require("../utils/cache");
 
 router.get("/universities", async (req, res) => {
-  let universities = await prisma.university.findMany({
-    where: {
-      isActive: true,
-      emailDomain: { in: allowedEmailDomains },
-    },
-    select: { name: true, shortName: true, emailDomain: true },
-    orderBy: { name: "asc" },
-  });
-  if (!universities.length) {
-    // Fallback: create default entries based on allowed domains
+  // Public, rarely-changing list — cached for 5 minutes and invalidated by the
+  // admin university routes on write.
+  const universities = await cache.wrap(cache.KEYS.publicUniversities, 300, async () => {
+    const rows = await prisma.university.findMany({
+      where: {
+        isActive: true,
+        emailDomain: { in: allowedEmailDomains },
+      },
+      select: { name: true, shortName: true, emailDomain: true },
+      orderBy: { name: "asc" },
+    });
+    if (rows.length) return rows;
+    // Fallback: derive entries from the allowed domains when the DB is empty
+    // (fresh install, before the seed has run).
     const domainNames = {
       "lpu.in": "Lovely Professional University",
       "rguktn.ac.in": "Rajiv Gandhi University of Knowledge and Technologies",
     };
-    universities = allowedEmailDomains.map((domain) => ({
+    return allowedEmailDomains.map((domain) => ({
       name: domainNames[domain] || domain,
       shortName: domain.split(".")[0].toUpperCase(),
       emailDomain: domain,
     }));
-  }
+  });
   ok(res, universities);
 });
 

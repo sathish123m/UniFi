@@ -51,7 +51,8 @@ npm run dev
 Useful commands:
 
 ```bash
-npm run check
+npm run check          # syntax + unit tests + frontend build
+npm run test:api       # HTTP/integration suite (Jest + Supertest; needs Postgres)
 npm run smoke
 npm run db:studio
 npm --prefix backend run smtp:test -- your-email@example.com
@@ -68,10 +69,26 @@ Required features for your project:
 
 > No payment gateway is required — UniFi is non-custodial and record-only.
 
+## Caching and Background Jobs
+
+- **Redis cache** (`backend/src/utils/cache.js`) — read-through cache for platform
+  configuration and the public university list. Every operation degrades to a
+  cache miss if Redis is unavailable, and admin writes invalidate the affected
+  key immediately. Tune with `CACHE_TTL_SECONDS` (default 60s).
+- **Background jobs** — the delinquency sweep (hourly) and transient-row cleanup
+  (every 6h) run on an in-process scheduler by default. Set `QUEUE_ENABLED=true`
+  to run them through **BullMQ** instead, which de-duplicates across instances
+  and adds retries with exponential backoff. A worker keeps a blocking Redis
+  connection open, so on a metered Redis plan check `QUEUE_DRAIN_DELAY_MS`
+  (default 30s) before enabling it.
+- `npm run jobs:run` still runs both jobs once and exits, for an external cron.
+
 ## CI and Engineering Quality
 - GitHub Actions CI on every push/PR to `main`
-- Backend syntax validation
-- Prisma client generation check
+- Backend syntax validation and Prisma client generation
+- Prisma migration-drift check against `schema.prisma`
+- Unit tests (`node --test`) and an HTTP integration suite (Jest + Supertest)
+  against a real Postgres + Redis service
 - Frontend production build check
 - Standardized issue templates and PR template
 - Contribution rules in `CONTRIBUTING.md`

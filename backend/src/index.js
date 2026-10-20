@@ -1,158 +1,132 @@
 require("dotenv").config();
-require("express-async-errors");
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
-const hpp = require("hpp");
-const { errorHandler } = require("./middleware/errorHandler");
-const { globalRateLimiter } = require("./middleware/rateLimiter");
-const { validateEnv, corsOrigins } = require("./config/env");
 const logger = require("./config/logger");
-
+const { validateEnv } = require("./config/env");
 const { checkAndConnectAll } = require("./utils/connectionChecks");
-
-validateEnv();
-
-const app = express();
-
-app.disable("x-powered-by");
-if ((process.env.NODE_ENV || "development") === "production") {
-  // Required behind managed proxies/load balancers (Render, Fly, etc.)
-  app.set("trust proxy", 1);
-}
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-  }),
-);
-app.use(hpp());
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Non-browser clients (curl, server-to-server, health checks) send no Origin.
-      if (!origin) return callback(null, true);
-      const allowedList = corsOrigins();
-      const isProd = (process.env.NODE_ENV || "development") === "production";
-      // In production the only accepted origins are the explicit allowlist
-      // (CORS_ORIGINS env + configured frontend URLs). We deliberately do NOT
-      // trust every *.vercel.app host: with credentials enabled that would let
-      // any attacker-controlled Vercel deployment call the API on a user's
-      // behalf. Preview deployments should be added to CORS_ORIGINS explicitly.
-      if (allowedList.includes(origin)) return callback(null, true);
-      // Outside production, allow localhost dev servers and Vercel preview
-      // builds for convenience only.
-      if (!isProd) {
-        const isVercelPreview = /\.vercel\.app$/i.test(new URL(origin).hostname);
-        const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin);
-        if (isVercelPreview || isLocalhost) return callback(null, true);
-      }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true,
-  }),
-);
-app.use(express.json({ limit: "10kb" }));
-app.use(express.urlencoded({ extended: true }));
-if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
-app.use("/api", globalRateLimiter);
-
-app.get("/health", (_, res) =>
-  res.json({
-    status: "ok",
-    time: new Date(),
-    mode: "record-only",
-  }),
-);
-
-app.get("/", (_, res) =>
-  res.json({
-    success: true,
-    message: "UniFi backend is running",
-    health: "/health",
-    apiBase: "/api",
-  }),
-);
-
-app.get("/api", (_, res) =>
-  res.json({
-    success: true,
-    message: "UniFi API is running",
-    routes: [
-      "/api/auth",
-      "/api/users",
-      "/api/loans",
-      "/api/payments",
-      "/api/admin",
-    ],
-  }),
-);
-
-app.use("/api/auth", require("./routes/auth.routes"));
-app.use("/api/users", require("./routes/user.routes"));
-app.use("/api/loans", require("./routes/loan.routes"));
-app.use("/api/admin", require("./routes/admin.routes"));
-app.use((_, res) =>
-  res.status(404).json({ success: false, message: "Route not found" }),
-);
-app.use(errorHandler);
+const app = require("./app");
+const { sweepDelinquency } = require("./services/loan.service");
+const { runMaintenance } = require("./jobs/maintenance");
 
 const PORT = process.env.PORT || 5000;
 
-const { sweepDelinquency } = require('./services/loan.service')
-const { runMaintenance } = require('./jobs/maintenance')
+const queueEnabled = () =>
+  String(process.env.QUEUE_ENABLED || "false").toLowerCase() === "true";
 
-const startBackgroundJobs = () => {
-  const SWEEP_INTERVAL_MS = Number(process.env.SWEEP_INTERVAL_MS || 60 * 60 * 1000) // 1 hour
-  const MAINTENANCE_INTERVAL_MS = Number(process.env.MAINTENANCE_INTERVAL_MS || 6 * 60 * 60 * 1000) // 6 hours
+/**
+ * Single-instance fallback (also the default).
+ *
+ * Runs the sweep/cleanup on timers inside the API process: zero extra infra,
+ * but it does not dedupe across instances and stops when the instance sleeps.
+ * Enable BullMQ with QUEUE_ENABLED=true to get dedupe + retries + backoff.
+ */
+const startIntervalJobs = () => {
+  const SWEEP_INTERVAL_MS = Number(process.env.SWEEP_INTERVAL_MS || 60 * 60 * 1000); // 1 hour
+  const MAINTENANCE_INTERVAL_MS = Number(process.env.MAINTENANCE_INTERVAL_MS || 6 * 60 * 60 * 1000); // 6 hours
 
   // In-process re-entrancy guard: a slow sweep must not overlap the next tick
   // (overlapping sweeps previously double-applied delinquency penalties).
-  let sweepRunning = false
-  let maintenanceRunning = false
+  let sweepRunning = false;
+  let maintenanceRunning = false;
 
   const runSweep = async (label) => {
     if (sweepRunning) {
-      logger.warn(`[Background Job] Sweep already running; skipping ${label}`)
-      return
+      logger.warn(`[Background Job] Sweep already running; skipping ${label}`);
+      return;
     }
-    sweepRunning = true
+    sweepRunning = true;
     try {
-      const stats = await sweepDelinquency()
-      logger.info(`[Background Job] ${label} delinquency sweep: ${JSON.stringify(stats)}`)
+      const stats = await sweepDelinquency();
+      logger.info(`[Background Job] ${label} delinquency sweep: ${JSON.stringify(stats)}`);
     } catch (e) {
-      logger.error(`[Background Job] ${label} delinquency sweep failed: ${e.message}`)
+      logger.error(`[Background Job] ${label} delinquency sweep failed: ${e.message}`);
     } finally {
-      sweepRunning = false
+      sweepRunning = false;
     }
-  }
+  };
 
   const runCleanup = async (label) => {
-    if (maintenanceRunning) return
-    maintenanceRunning = true
+    if (maintenanceRunning) return;
+    maintenanceRunning = true;
     try {
-      await runMaintenance()
-      if (label) logger.info(`[Background Job] ${label} maintenance complete`)
+      await runMaintenance();
+      if (label) logger.info(`[Background Job] ${label} maintenance complete`);
     } finally {
-      maintenanceRunning = false
+      maintenanceRunning = false;
     }
+  };
+
+  const timers = [
+    setTimeout(() => runSweep("Initial"), 10000),
+    setTimeout(() => runCleanup("Initial"), 30000),
+    setInterval(() => runSweep("Scheduled"), SWEEP_INTERVAL_MS),
+    setInterval(() => runCleanup("Scheduled"), MAINTENANCE_INTERVAL_MS),
+  ];
+
+  return { mode: "interval", stop: () => timers.forEach((t) => clearTimeout(t)) };
+};
+
+const startQueueJobs = async () => {
+  const { ensureSchedules } = require("./queues/maintenance.queue");
+  const { createMaintenanceWorker } = require("./workers/maintenance.worker");
+  await ensureSchedules();
+  createMaintenanceWorker();
+  logger.info("[queue] BullMQ worker started (sweep + cleanup)");
+  return { mode: "queue", stop: () => {} };
+};
+
+let backgroundJobs = null;
+
+const startBackgroundJobs = async () => {
+  if (!queueEnabled()) {
+    backgroundJobs = startIntervalJobs();
+    logger.info("[jobs] in-process scheduler active (set QUEUE_ENABLED=true to use BullMQ)");
+    return;
   }
+  try {
+    backgroundJobs = await startQueueJobs();
+  } catch (e) {
+    logger.warn(`[queue] unavailable (${e.message}); falling back to in-process scheduler`);
+    backgroundJobs = startIntervalJobs();
+  }
+};
 
-  setTimeout(() => runSweep('Initial'), 10000)
-  setTimeout(() => runCleanup('Initial'), 30000)
+const shutdown = async (signal) => {
+  logger.info(`[shutdown] ${signal} received; closing cleanly`);
+  try {
+    if (backgroundJobs && backgroundJobs.stop) backgroundJobs.stop();
 
-  setInterval(() => runSweep('Scheduled'), SWEEP_INTERVAL_MS)
-  setInterval(() => runCleanup('Scheduled'), MAINTENANCE_INTERVAL_MS)
-}
+    const { closeWorker } = require("./workers/maintenance.worker");
+    const { closeQueue } = require("./queues/maintenance.queue");
+    const { closeQueueConnection } = require("./queues/connection");
+    await closeWorker();
+    await closeQueue();
+    await closeQueueConnection();
+
+    const redis = require("./config/redis");
+    await redis.quit().catch(() => {});
+
+    const prisma = require("./config/db");
+    await prisma.$disconnect().catch(() => {});
+  } catch (e) {
+    logger.warn(`[shutdown] cleanup error: ${e.message}`);
+  } finally {
+    process.exit(0);
+  }
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 const start = async () => {
   try {
+    validateEnv();
     await checkAndConnectAll();
     app.listen(PORT, () => {
       logger.info(`UniFi API -> http://localhost:${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
       logger.info("Mode: record-only (non-custodial)");
-      startBackgroundJobs();
+      startBackgroundJobs().catch((e) =>
+        logger.error(`[jobs] failed to start: ${e.message}`),
+      );
     });
   } catch (e) {
     logger.error(`Startup failed: ${e.message}`);

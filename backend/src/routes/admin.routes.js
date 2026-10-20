@@ -8,6 +8,8 @@ const { validate, platformConfigSchema, adminCreateSchema } = require('../middle
 const loanSvc = require('../services/loan.service')
 const storageService = require('../services/storage.service')
 const { decrypt } = require('../utils/encryption')
+const cache = require('../utils/cache')
+const { invalidatePlatformConfig } = require('../services/platformConfig.service')
 
 const isAdmin = [protect, restrictTo('SUPER_ADMIN', 'MOD_ADMIN', 'FINANCE_ADMIN')]
 router.use(...isAdmin)
@@ -459,6 +461,7 @@ router.post('/config', restrictTo('SUPER_ADMIN', 'FINANCE_ADMIN'), validate(plat
     },
   })
 
+  await invalidatePlatformConfig()
   ok(res, cfg, 'Config updated', 201)
 })
 
@@ -499,6 +502,7 @@ router.post('/universities', restrictTo('SUPER_ADMIN'), async (req, res) => {
   const created = await prisma.university.create({
     data: { id: createId(), name, shortName, emailDomain, city, state, isActive: true },
   })
+  await cache.del(cache.KEYS.publicUniversities)
   ok(res, created, 'University added', 201)
 })
 
@@ -521,6 +525,7 @@ router.patch('/universities/:id', restrictTo('SUPER_ADMIN'), async (req, res) =>
 
   try {
     const updated = await prisma.university.update({ where: { id: req.params.id }, data })
+    await cache.del(cache.KEYS.publicUniversities)
     ok(res, updated, 'University updated')
   } catch {
     res.status(404).json({ success: false, message: 'University not found' })

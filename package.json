@@ -11,6 +11,7 @@
     "check:backend": "npm --prefix backend run check:syntax",
     "check:frontend": "npm --prefix frontend run build",
     "test:backend": "npm --prefix backend run test",
+    "test:api": "npm --prefix backend run test:api",
     "check": "npm run check:backend && npm run test:backend && npm run check:frontend",
     "db:studio": "bash scripts/studio.sh",
     "smoke": "bash scripts/smoke.sh",

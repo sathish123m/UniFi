@@ -26,9 +26,23 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      # The API tests exercise the real rate-limit store and the read-through
+      # cache, both of which fall back to memory when Redis is absent. Running
+      # against a real Redis keeps CI honest about the production path.
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/unifi_ci
+      REDIS_URL: redis://localhost:6379
       JWT_ACCESS_SECRET: ci-access-secret-not-used
       JWT_REFRESH_SECRET: ci-refresh-secret-not-used
       ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
@@ -82,6 +96,11 @@ jobs:
 
       - name: Backend Tests
         run: npm test
+        working-directory: backend
+
+      # HTTP/integration suite (Jest + Supertest) against the migrated database.
+      - name: Backend API Tests
+        run: npm run test:api
         working-directory: backend
 
       - name: Frontend Build Check

@@ -109,20 +109,24 @@ class HybridRateLimitStore {
   }
 }
 
-const store = () => new HybridRateLimitStore('unifi:rl:')
+// Each limiter gets its own Redis prefix. Sharing one prefix made the global
+// (1/min) and auth (15 min) windows collide on the same key: whichever ran
+// second reset the other's TTL, so the login limit was effectively "100 per
+// minute" instead of "20 per 15 minutes".
+const store = (name) => new HybridRateLimitStore(`unifi:rl:${name}:`)
 
 // Authenticated callers are keyed by user id so a shared campus NAT gateway does
 // not cause one student's requests to throttle their peers. Pre-auth routes
 // (login/register/OTP) fall back to the client IP.
 const userOrIpKey = (req) => req.user?.id || req.ip
 
-const make = (windowMs, max, msg, { keyGenerator } = {}) =>
+const make = (windowMs, max, msg, { keyGenerator, name } = {}) =>
   rateLimit({
     windowMs,
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    store: store(),
+    store: store(name),
     keyGenerator,
     message: { success: false, message: msg },
   })
@@ -131,7 +135,7 @@ const globalRateLimiter = make(
   asPositiveInt(process.env.RATE_LIMIT_WINDOW_MS, 60 * 1000),
   asPositiveInt(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
   'Too many requests',
-  { keyGenerator: userOrIpKey }
+  { keyGenerator: userOrIpKey, name: 'global' }
 )
 
 // Login/register/OTP are unauthenticated, so they must be keyed by IP. The
@@ -140,13 +144,15 @@ const globalRateLimiter = make(
 const authRateLimiter = make(
   15 * 60 * 1000,
   asPositiveInt(process.env.AUTH_RATE_LIMIT_MAX, 20),
-  'Too many auth attempts, try again in 15 minutes'
+  'Too many auth attempts, try again in 15 minutes',
+  { name: 'auth' }
 )
 
 const otpRateLimiter = make(
   60 * 1000,
   asPositiveInt(process.env.OTP_RATE_LIMIT_MAX, 3),
-  'Too many OTP requests'
+  'Too many OTP requests',
+  { name: 'otp' }
 )
 
 module.exports = { globalRateLimiter, authRateLimiter, otpRateLimiter, HybridRateLimitStore }

@@ -1,5 +1,6 @@
 const prisma = require('../config/db')
 const { createId } = require('@paralleldrive/cuid2')
+const { getPlatformConfig } = require('./platformConfig.service')
 
 const SCORE_MIN = 300; const SCORE_MAX = 900
 
@@ -25,7 +26,7 @@ const updateScore = async (userId, delta, reason, loanId=null) => {
   const user = await prisma.user.findUnique({ where:{id:userId}, select:{creditScore:true} })
   const prev = user.creditScore
   const next = Math.min(SCORE_MAX, Math.max(SCORE_MIN, prev + delta))
-  const cfg = await prisma.platformConfig.findFirst({ orderBy: { createdAt: 'desc' } })
+  const cfg = await getPlatformConfig()
   const borrowLimit = borrowLimitForScore(next, cfg)
   await prisma.$transaction([
     prisma.user.update({ where:{id:userId}, data:{creditScore:next, borrowLimit} }),

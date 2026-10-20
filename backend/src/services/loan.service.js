@@ -2,6 +2,7 @@ const prisma = require('../config/db')
 const { calculateLoan, generatePublicId } = require('../utils/loanCalc')
 const { createNotification } = require('./notification.service')
 const { updateScore, SCORE_EVENTS } = require('./credit.service')
+const { getPlatformConfig } = require('./platformConfig.service')
 const { createId } = require('@paralleldrive/cuid2')
 
 const err = (msg, code = 400) => Object.assign(new Error(msg), { statusCode: code })
@@ -21,10 +22,7 @@ const TENURE_DAYS = { SEVEN: 7, FOURTEEN: 14, THIRTY: 30 }
 // charges no interest, no platform fee and no late fee.
 const getRepaymentPayable = (loan) => loan.totalRepayAmount || loan.principalAmount || 0
 
-const getConfig = async () => {
-  const cfg = await prisma.platformConfig.findFirst({ orderBy: { createdAt: 'desc' } })
-  return cfg || { minLoanAmount: 500, maxLoanAmount: 10000 }
-}
+const getConfig = () => getPlatformConfig()
 
 // Record-only ledger: an audit trail of what each peer attested to. It never
 // represents money held or moved by UniFi. Keyed so repeated confirmations are
