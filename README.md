@@ -53,6 +53,7 @@ Useful commands:
 ```bash
 npm run check          # syntax + unit tests + frontend build
 npm run test:api       # HTTP/integration suite (Jest + Supertest; needs Postgres)
+npm --prefix backend run mail:test -- you@example.com   # send through the real provider chain
 npm run smoke
 npm run db:studio
 npm --prefix backend run smtp:test -- your-email@example.com

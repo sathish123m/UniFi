@@ -19,7 +19,8 @@
     "db:studio": "npx prisma studio",
     "db:reset": "npx prisma migrate reset",
     "db:push": "npx prisma db push",
-    "smtp:test": "node src/scripts/smtpTest.js"
+    "smtp:test": "node src/scripts/smtpTest.js",
+    "mail:test": "node src/scripts/mailTest.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",
