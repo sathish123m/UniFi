@@ -28,7 +28,7 @@
     "bcrypt": "^5.1.1",
     "bullmq": "^5.81.5",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.1",
+    "dotenv": "^18.0.8",
     "express": "^4.18.2",
     "express-async-errors": "^3.1.1",
     "express-rate-limit": "^7.1.5",
